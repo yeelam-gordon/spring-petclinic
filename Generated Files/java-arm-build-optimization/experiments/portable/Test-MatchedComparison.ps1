@@ -1,3 +1,4 @@
+param([string]$SetupTestRoot=$env:COMPARISON_SETUP_TEST_ROOT)
 $ErrorActionPreference='Stop'
 $runner=Join-Path $PSScriptRoot 'Invoke-MatchedComparison.ps1'
 . $runner -LibraryOnly
@@ -97,10 +98,12 @@ Check 'Manual workflow, exact two-label matrix, explicit acknowledgement, no ret
     Require ($y-match'architecture: aarch64' -and $y-match'VC.Tools.ARM64') 'Native tool preflight missing'
     Require ($y-match'-Workload \$env:WORKLOAD -Samples 3 -LoopbackTests -ExclusiveSlotApproved') 'Both matrix jobs must explicitly use the validated common loopback policy'
 }
+$workflowRuns=@{}
 Check 'Every embedded workflow PowerShell block parses without execution' {
     $lines=Get-Content (Join-Path $PSScriptRoot 'matched-comparison.workflow.yml')
     $blocks=0
     for($i=0;$i-lt$lines.Count;$i++){
+        if($lines[$i]-match'^      - name: (.+)$'){$stepName=$Matches[1]}
         if($lines[$i]-match'^\s+run: \|$'){
             $body=@();$i++
             while($i-lt$lines.Count -and ($lines[$i]-match'^          ' -or -not$lines[$i].Trim())){
@@ -109,9 +112,93 @@ Check 'Every embedded workflow PowerShell block parses without execution' {
             $i--;$errors=$null;$tokens=$null
             $null=[Management.Automation.Language.Parser]::ParseInput(($body -join "`n"),[ref]$tokens,[ref]$errors)
             Require ($errors.Count-eq0) 'Workflow PowerShell syntax';$blocks++
+            $workflowRuns[$stepName]=$body -join "`n"
         }
     }
-    Require ($blocks-eq3) 'Expected three embedded executable setup/run blocks'
+    Require ($blocks-eq5) 'Expected five embedded evidence/setup/run blocks'
+}
+Check 'Actual workflow setup retains failed diagnostics and success leaves runner output fresh' {
+    if(-not$SetupTestRoot){
+        if(-not$env:GITHUB_WORKSPACE){throw 'Set -SetupTestRoot outside the publication payload for local mocked setup tests'}
+        $SetupTestRoot=Join-Path $env:GITHUB_WORKSPACE 'comparison-owned/setup-evidence/mock-tests'
+    }
+    $tokens=$null;$errors=$null
+    $ast=[Management.Automation.Language.Parser]::ParseInput($workflowRuns['Explicit driver setup, checksum and Windows ARM64 compiler preflight'],[ref]$tokens,[ref]$errors)
+    $functions=($ast.EndBlock.Statements|Where-Object {$_-is[Management.Automation.Language.FunctionDefinitionAst]}|ForEach-Object {$_.Extent.Text})-join"`n"
+    Require ($functions-match'function Invoke-ComparisonSetup') 'Actual workflow setup implementation absent'
+    $saved=@{};foreach($n in 'GITHUB_WORKSPACE','GITHUB_ENV','JAVA_HOME','WORKLOAD','ComSpec','ProgramFiles(x86)','CHECKOUT_OUTCOME','JAVA_OUTCOME','STATIC_OUTCOME','DRIVER_OUTCOME'){$saved[$n]=[Environment]::GetEnvironmentVariable($n)}
+    try {
+        foreach($scenario in 'checksum','missing-compiler','native-failure','success'){
+            $caseRoot=Join-Path $SetupTestRoot ($scenario+'-'+[guid]::NewGuid().ToString('N'))
+            New-Item $caseRoot -ItemType Directory -Force|Out-Null
+            $env:GITHUB_WORKSPACE=$caseRoot;$env:GITHUB_ENV=Join-Path $caseRoot 'github-env';$env:JAVA_HOME=Join-Path $caseRoot 'mock-jdk';$env:WORKLOAD='current17'
+            $env:ComSpec=Join-Path $caseRoot 'mock-cmd.exe';[Environment]::SetEnvironmentVariable('ProgramFiles(x86)',$caseRoot)
+            $module=New-Module -ArgumentList $functions,$caseRoot,$scenario -ScriptBlock {
+                param($definitions,$fixtureRoot,$fixtureCase)
+                . ([scriptblock]::Create($definitions))
+                function Invoke-WebRequest($Uri,$OutFile){'mock download'|Set-Content $OutFile}
+                function Get-FileHash($Path,$Algorithm){
+                    $value=switch -Regex ($Path){
+                        'vendor\.zip$' {if($fixtureCase-eq'checksum'){'wrong'}else{'4DD97B1F26525055CEC960FB5B953B70D1E6606F96F5B096EFA932754FD3E9D0238E00CA97779368F29CB751F1776445C45DA618EA8D0D84692C3B936087309F'}}
+                        '\.c$' {'31198B329118419DB30A8178FB438F44953B33F346C30E1BF313DF2F4E6A021E'}
+                        '\.h$' {'E12BE1E39BB5FD0755B87D151D91712D9606D1118B1F6CCAB6BC2CB0857AA9DF'}
+                    };@{Hash=$value}
+                }
+                function Expand-Archive($Path,$DestinationPath){
+                    $d=Join-Path $DestinationPath 'maven-mvnd-1.0.6-windows-amd64'
+                    foreach($relative in 'bin/mvnd.exe','mvn/lib/mvnd/mvnd-native-1.0.6.jar','mvn/lib/maven-core-3.9.16.jar'){
+                        $file=Join-Path $d $relative;New-Item (Split-Path $file -Parent) -ItemType Directory -Force|Out-Null;'mock file'|Set-Content $file
+                    }
+                }
+                function Binary-Setup($path){@{format='MOCK';machine='0xAA64';fileVersion='mock-only';path=$path}}
+                function Add-SetupResource($jar,$dll){$script:mockResourceAdded=$true}
+                function Start-SetupProcess($file,$arguments,$log){
+                    if($file-match'java(?:\.exe)?$'){"java.runtime.version = 17.mock`njava.vendor = MOCK`nos.arch = aarch64"|Set-Content $log;return 0}
+                    if($file-match'vswhere\.exe$'){
+                        ''|Set-Content $log
+                        if($fixtureCase-eq'native-failure'){return 23}
+                        if($fixtureCase-ne'missing-compiler'){(Join-Path $fixtureRoot 'mock-vs')|Set-Content $log}
+                        return 0
+                    }
+                    if($file-eq$env:ComSpec){
+                        ((Join-Path $fixtureRoot 'cl.exe')+"`nMOCK compiler version; target ARM64")|Set-Content $log
+                        'mock DLL'|Set-Content (Join-Path $env:GITHUB_WORKSPACE 'comparison-owned/native/mvndnative.dll')
+                        return 0
+                    }
+                    'mock process success'|Set-Content $log;return 0
+                }
+                $script:fixtureCaught=$null;try{Invoke-ComparisonSetup -Windows $true}catch{$script:fixtureCaught=$_.Exception.Message}
+            }
+            $actual=& $module { [pscustomobject]@{state=$script:state;setup=$script:setup} }
+            $env:CHECKOUT_OUTCOME='success';$env:JAVA_OUTCOME='success';$env:STATIC_OUTCOME='success';$env:DRIVER_OUTCOME=if($scenario-eq'success'){'success'}else{'failure'}
+            & ([scriptblock]::Create($workflowRuns['Finalize setup diagnostics even when an action failed']))
+            $json=Join-Path $actual.setup 'setup.json'
+            Require ((Test-Path $json) -and (Get-Item $json).Length-gt0) 'Failure artifact empty/missing'
+            $record=Get-Content $json -Raw|ConvertFrom-Json
+            if($scenario-eq'checksum'){Require ($record.status-eq'FAIL' -and $record.stage-eq'vendor-checksum' -and $null-eq$record.nativeExitCode -and $record.scriptExitCode-eq1) 'Checksum diagnostic gate'}
+            elseif($scenario-eq'missing-compiler'){Require ($record.status-eq'FAIL' -and $record.stage-eq'compiler-discovery' -and $record.nativeExitCode-eq0 -and $record.error-match'component absent') 'Missing compiler must retain native 0 versus semantic failure'}
+            elseif($scenario-eq'native-failure'){Require ($record.status-eq'FAIL' -and $record.nativeExitCode-eq23 -and $record.scriptExitCode-eq1) 'Native failure code lost'}
+            else{Require ($record.status-eq'PASS' -and $record.scriptExitCode-eq0) 'Mock successful setup'}
+            $OutputDirectory=Join-Path $caseRoot 'comparison-owned/evidence'
+            Require (-not(Test-Path $OutputDirectory)) 'Setup precreated measured runner evidence'
+            $guard=(Get-Content $runner|Where-Object {$_-match'^Require ' -and $_.Contains("'Fresh output required'")})-join"`n"
+            Require ($guard-match'Fresh output required') 'Actual unchanged runner fresh-output guard not found'
+            & ([scriptblock]::Create($guard))
+            if($scenario-eq'success'){
+                New-Item $OutputDirectory -ItemType Directory|Out-Null
+                Rejects {& ([scriptblock]::Create($guard))} 'Fresh output required'
+                Remove-Item $OutputDirectory
+            }
+        }
+        $javaFailure=Join-Path $SetupTestRoot ('setup-java-'+[guid]::NewGuid().ToString('N'))
+        $env:GITHUB_WORKSPACE=$javaFailure
+        & ([scriptblock]::Create($workflowRuns['Initialize separate setup evidence before Java setup']))
+        $env:JAVA_OUTCOME='failure';$env:STATIC_OUTCOME='skipped';$env:DRIVER_OUTCOME='skipped'
+        & ([scriptblock]::Create($workflowRuns['Finalize setup diagnostics even when an action failed']))
+        $record=Get-Content (Join-Path $javaFailure 'comparison-owned/setup-evidence/setup.json') -Raw|ConvertFrom-Json
+        Require ($record.status-eq'FAIL' -and $record.stage-eq'java' -and $null-eq$record.nativeExitCode -and $record.jdk-eq'not-observed') 'setup-java action failure evidence lost or identity invented'
+        Require (-not(Test-Path (Join-Path $javaFailure 'comparison-owned/evidence'))) 'Early setup action precreated runner output'
+    } finally {foreach($n in $saved.Keys){[Environment]::SetEnvironmentVariable($n,$saved[$n])}}
 }
 $yamlParser='unavailable';$actionsSchema='unavailable: actionlint not on PATH'
 if(Get-Command ConvertFrom-Yaml -ErrorAction SilentlyContinue){
