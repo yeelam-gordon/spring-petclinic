@@ -1,5 +1,5 @@
-# Manual-only bounded comparison: one dispatch, two ARM64 jobs, no retries.
-# Preserve any existing repository environment approval policy.
+# INACTIVE TEMPLATE: outside .github. Moving it requires separate approval/budget.
+# Configure environment "matched-comparison-approval" with required reviewers FIRST.
 # Include these reviewed scripts in the authorized repository; no private paths.
 # Hosted Windows ARM (public: 4 CPU/16 GB) and Mac ARM (3 CPU/7 GB) differ.
 name: Manual matched ARM64 screen (authorization required)
