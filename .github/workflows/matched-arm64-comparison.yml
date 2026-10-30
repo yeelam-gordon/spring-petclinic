@@ -203,11 +203,47 @@ jobs:
         env:
           WORKLOAD: ${{ inputs.workload }}
         run: |
+          $ErrorActionPreference='Stop'
+          function Invoke-ReviewedHostedEnvironment([scriptblock]$Run,[bool]$Windows=$IsWindows) {
+            $original=[Environment]::GetEnvironmentVariable('MAVEN_OPTS','Process')
+            $empty=[string]::IsNullOrEmpty($original)
+            $known=$Windows -and $original-ceq'-Xms256m'
+            $setup=Join-Path $env:GITHUB_WORKSPACE 'comparison-owned/setup-evidence'
+            New-Item $setup -ItemType Directory -Force|Out-Null
+            $receipt=@{
+              originalValue=$(if($empty-or$known){$original}else{'[REDACTED_UNKNOWN_OPTION_VALUE]'})
+              originalSha256=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes([string]$original)))
+              imageOS=$env:ImageOS;imageVersion=$env:ImageVersion
+              source='https://github.com/actions/runner-images/blob/8b8c516342f24f47f3386c8f50acc3ec45337932/images/windows/scripts/build/Install-JavaTools.ps1'
+              origin='Official pinned Windows installer configures -Xms256m; exact failed-job value/origin was not captured. This receipt observes the current process only.'
+              baseline='Empty MAVEN_OPTS on both platforms and both engines; removes only a recognized Windows initial-heap default'
+              decision=$(if($empty){'accept-empty'}elseif($known){'normalize-exact-reviewed-Windows-default'}else{'reject-unknown'})
+              restored=$false
+            }
+            $path=Join-Path $setup 'hosted-environment.json'
+            $receipt|ConvertTo-Json -Depth 5|Set-Content $path
+            if(-not$empty-and-not$known){
+              $receipt.restored=$true
+              $receipt|ConvertTo-Json -Depth 5|Set-Content $path
+              throw 'Unknown injected MAVEN_OPTS rejected before measurement; see redacted hosted-environment.json'
+            }
+            try{
+              Remove-Item Env:MAVEN_OPTS -ErrorAction SilentlyContinue
+              & $Run
+            }finally{
+              if($null-eq$original){Remove-Item Env:MAVEN_OPTS -ErrorAction SilentlyContinue}else{[Environment]::SetEnvironmentVariable('MAVEN_OPTS',$original,'Process')}
+              $receipt.restored=([Environment]::GetEnvironmentVariable('MAVEN_OPTS','Process')-ceq$original)
+              $receipt|ConvertTo-Json -Depth 5|Set-Content $path
+              if(-not$receipt.restored){throw 'Process MAVEN_OPTS restoration failed'}
+            }
+          }
           $owned=Join-Path $env:GITHUB_WORKSPACE 'comparison-owned'
-          & './Generated Files/java-arm-build-optimization/experiments/portable/Invoke-MatchedComparison.ps1' `
-            -ProjectFullClone (Join-Path $owned 'project') -JavaHome $env:JAVA_HOME -MvndHome $env:MVND_HOME `
-            -LocalCache (Join-Path $owned 'm2') -OutputDirectory (Join-Path $owned 'evidence') `
-            -Workload $env:WORKLOAD -Samples 3 -LoopbackTests -ExclusiveSlotApproved
+          Invoke-ReviewedHostedEnvironment {
+            & './Generated Files/java-arm-build-optimization/experiments/portable/Invoke-MatchedComparison.ps1' `
+              -ProjectFullClone (Join-Path $owned 'project') -JavaHome $env:JAVA_HOME -MvndHome $env:MVND_HOME `
+              -LocalCache (Join-Path $owned 'm2') -OutputDirectory (Join-Path $owned 'evidence') `
+              -Workload $env:WORKLOAD -Samples 3 -LoopbackTests -ExclusiveSlotApproved
+          }
       - name: Finalize setup diagnostics even when an action failed
         if: always()
         env:

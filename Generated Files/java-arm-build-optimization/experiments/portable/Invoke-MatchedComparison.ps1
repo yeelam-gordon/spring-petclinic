@@ -57,6 +57,11 @@ function Signature($Value) { ConvertTo-Json -InputObject $Value -Depth 25 -Compr
 function Same($Actual,$Expected,[string]$Message) { Require ((Signature $Actual)-ceq(Signature $Expected)) $Message }
 function Median([double[]]$Values) { Require ($Values.Count-gt0) 'Empty timing sample';$s=@($Values|Sort-Object);if($s.Count%2){$s[[int][math]::Floor($s.Count/2)]}else{($s[$s.Count/2-1]+$s[$s.Count/2])/2} }
 function NativeCode([int]$Code,[string]$Label) { Require ($Code-eq0) "$Label returned native exit $Code" }
+function MacNativeLibraryPath([string]$Text) {
+    $records=@([regex]::Matches($Text,'(?m)^0x[0-9A-Fa-f]+[ \t]+(/[^\r\n]*mvndnative[^\r\n]*\.(?:jnilib|dylib))[ \t]*\r?$'))
+    Require ($records.Count-eq1) 'Expected exactly one mapped JNI library record'
+    $records[0].Groups[1].Value
+}
 function DecodeJavaProperty([string]$Value) {
     $out=[Text.StringBuilder]::new()
     for($i=0;$i-lt$Value.Length;$i++){
@@ -306,8 +311,7 @@ try{
     AssertRuntime $result.daemonRuntime $result.selectedRuntime 'Actual daemon VM'
     Require ($properties-match'(?m)^os.arch=aarch64\r?$' -and $properties-notmatch'(?m)^library.mvndnative.path=') 'Daemon ARM64/default native loading proof failed'
     $libs=Get-Content (Join-Path $OutputDirectory 'daemon-VM.dynlibs.log') -Raw
-    $nativePattern=if($IsWindows){'(?m)([A-Za-z]:[^\r\n]*mvndnative[^\r\n]*\.dll)'}else{'(?m)(/[^\r\n]*mvndnative[^\s\r\n]*)'}
-    $loaded=[regex]::Match($libs,$nativePattern).Groups[1].Value.Trim()
+    $loaded=if($IsWindows){[regex]::Match($libs,'(?m)([A-Za-z]:[^\r\n]*mvndnative[^\r\n]*\.dll)').Groups[1].Value.Trim()}else{MacNativeLibraryPath $libs}
     Require ($loaded -and (Test-Path -LiteralPath $loaded)) 'Actual loaded JNI library path missing'
     Require ([IO.Path]::GetFullPath($loaded).StartsWith([IO.Path]::GetFullPath($tmp)+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) 'JNI not default-extracted under owned temp'
     $result.loadedNative=@{path=$loaded;sha256=(Get-FileHash -LiteralPath $loaded).Hash}

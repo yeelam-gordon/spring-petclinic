@@ -9,6 +9,27 @@ function Rejects([scriptblock]$Body,[string]$ExpectedMessage=''){
     try{& $Body}catch{$threw=$true;if($ExpectedMessage){Require ($_.Exception.Message-like"*$ExpectedMessage*") "Wrong rejection: $($_.Exception.Message)"}}
     Require $threw 'Expected rejection'
 }
+Check 'MAC-JNI-001 actual Mac mapped module wins over JVM option banner' {
+    $owned='/Users/runner/work/spring-petclinic/spring-petclinic/comparison-owned/evidence/jvm-owned'
+    $expected="$owned/mvndnative-unknown-7ec026a594b9b494-libmvndnative.jnilib"
+    $banner="Picked up JAVA_TOOL_OPTIONS: `"-Djava.io.tmpdir=$owned`" `"-Dmvndnative.tmpdir=$owned`" --enable-native-access=ALL-UNNAMED"
+    $fixture=$banner+"`n5324:`nDynamic libraries:`n0x00000001013f8000 `t"+$expected+"`n0x0000000101408000 `t$owned/jansi-2.4.3-6ad94ed535b831db-libjansi.jnilib"
+    Require ((MacNativeLibraryPath $fixture)-ceq$expected) 'Mapped JNI path lost or JVM banner selected'
+    Rejects {MacNativeLibraryPath $banner} 'Expected exactly one mapped JNI library record'
+    Rejects {MacNativeLibraryPath 'Picked up JAVA_TOOL_OPTIONS: "-Dmvndnative.tmpdir=/owned/mvndnative.jnilib"'} 'Expected exactly one mapped JNI library record'
+}
+Check 'MAC-JNI-001 mapped path spaces, horizontal spacing, CRLF and Mac suffixes' {
+    $path='/Users/runner/Work With Spaces/jvm-owned/mvndnative-unknown-libmvndnative.jnilib'
+    Require ((MacNativeLibraryPath ("0x1234 `t"+$path+"`r`n"))-ceq$path) 'Spaces/CRLF damaged mapped path'
+    Require ((MacNativeLibraryPath '0x1234 /owned/libmvndnative.dylib')-ceq'/owned/libmvndnative.dylib') 'Mapped dylib not parsed'
+}
+Check 'MAC-JNI-001 absent or ambiguous modules fail closed' {
+    Rejects {MacNativeLibraryPath '0x1234 /owned/libjansi.jnilib'} 'Expected exactly one mapped JNI library record'
+    Rejects {MacNativeLibraryPath "0x1234 /owned/libmvndnative.jnilib`n0x5678 /other/libmvndnative.jnilib"} 'Expected exactly one mapped JNI library record'
+}
+Check 'MAC-JNI-001 parsing preserves evidence for existing ownership rejection' {
+    Require ((MacNativeLibraryPath '0x1234 /other/libmvndnative.jnilib')-ceq'/other/libmvndnative.jnilib') 'Parser rewrote unowned path'
+}
 Check 'PowerShell AST parses' {
     foreach($path in @($runner,$PSCommandPath)){
         $tokens=$null;$errors=$null;$null=[Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors)
@@ -147,6 +168,43 @@ Check 'Actual pinned JDK downloader covers four native builds and rejects wrong 
         $yaml=Get-Content (Join-Path $PSScriptRoot 'matched-comparison.workflow.yml') -Raw
         Require ($yaml-match'distribution: jdkfile' -and $yaml-match'jdkFile: \$\{\{ steps.jdk_archive.outputs.jdkFile \}\}') 'Catalog resolver unexpectedly restored'
     } finally {foreach($n in $saved.Keys){[Environment]::SetEnvironmentVariable($n,$saved[$n])}}
+}
+Check 'Actual hosted environment boundary preserves strict unknown guard and fresh output' {
+    $tokens=$null;$errors=$null
+    $ast=[Management.Automation.Language.Parser]::ParseInput($workflowRuns['Matched package and separate test screen'],[ref]$tokens,[ref]$errors)
+    $definition=($ast.EndBlock.Statements|Where-Object {$_-is[Management.Automation.Language.FunctionDefinitionAst]}|ForEach-Object {$_.Extent.Text})-join"`n"
+    . ([scriptblock]::Create($definition))
+    $runnerAst=[Management.Automation.Language.Parser]::ParseFile($runner,[ref]$tokens,[ref]$errors)
+    $optionGuard=($runnerAst.EndBlock.Statements|Where-Object {$_.Extent.Text.Contains('Review nonempty injected option')}).Extent.Text
+    $freshGuard=(Get-Content $runner|Where-Object {$_-match'^Require ' -and $_.Contains("'Fresh output required'")})-join"`n"
+    Require ($optionGuard -and $freshGuard) 'Actual pinned guards absent'
+    $names=@('MAVEN_OPTS','MAVEN_ARGS','JAVA_TOOL_OPTIONS','JDK_JAVA_OPTIONS','_JAVA_OPTIONS','MVND_OPTS','MVND_CLIENT','GIT_DIR','GIT_WORK_TREE','GIT_COMMON_DIR','GITHUB_WORKSPACE')
+    $before=@{};foreach($n in $names){$before[$n]=[Environment]::GetEnvironmentVariable($n)}
+    try {
+        foreach($n in $names){if($n-ne'GITHUB_WORKSPACE'){Remove-Item "Env:$n" -ErrorAction SilentlyContinue}}
+        $root=if($SetupTestRoot){$SetupTestRoot}else{Join-Path $env:GITHUB_WORKSPACE 'comparison-owned/setup-evidence/mock-tests'}
+        $env:GITHUB_WORKSPACE=Join-Path $root ('hosted-env-'+[guid]::NewGuid().ToString('N'))
+        $OutputDirectory=Join-Path $env:GITHUB_WORKSPACE 'comparison-owned/evidence'
+        $env:MAVEN_OPTS='-Xms256m'
+        Rejects {& ([scriptblock]::Create($optionGuard))} 'Review nonempty injected option MAVEN_OPTS first'
+        $script:hostedCallbacks=0
+        $callback={& ([scriptblock]::Create($optionGuard));& ([scriptblock]::Create($freshGuard));$script:hostedCallbacks++}
+        Invoke-ReviewedHostedEnvironment $callback $true
+        Require ($script:hostedCallbacks-eq1 -and $env:MAVEN_OPTS-ceq'-Xms256m' -and -not(Test-Path $OutputDirectory)) 'Reviewed default normalization/restoration/fresh guard failed'
+        $env:MAVEN_OPTS='-Xmx9g'
+        Rejects {Invoke-ReviewedHostedEnvironment $callback $true} 'Unknown injected MAVEN_OPTS'
+        Require ($script:hostedCallbacks-eq1 -and $env:MAVEN_OPTS-ceq'-Xmx9g') 'Unknown option ran or mutated'
+        $receipt=Get-Content (Join-Path $env:GITHUB_WORKSPACE 'comparison-owned/setup-evidence/hosted-environment.json') -Raw|ConvertFrom-Json
+        Require ($receipt.originalValue-eq'[REDACTED_UNKNOWN_OPTION_VALUE]' -and $receipt.decision-eq'reject-unknown') 'Unknown option receipt leaked/misclassified'
+        $env:MAVEN_OPTS='-Xms256m'
+        Rejects {Invoke-ReviewedHostedEnvironment $callback $false} 'Unknown injected MAVEN_OPTS'
+        $env:MAVEN_OPTS=$null
+        Invoke-ReviewedHostedEnvironment $callback $false
+        Require ($script:hostedCallbacks-eq2) 'Mac empty shared baseline rejected'
+        $env:JAVA_TOOL_OPTIONS='-Xmx9g'
+        Rejects {Invoke-ReviewedHostedEnvironment $callback $true} 'Review nonempty injected option JAVA_TOOL_OPTIONS first'
+        Require ($script:hostedCallbacks-eq2) 'Other unknown injected option bypassed unchanged runner guard'
+    } finally {foreach($n in $names){if($null-eq$before[$n]){Remove-Item "Env:$n" -ErrorAction SilentlyContinue}else{[Environment]::SetEnvironmentVariable($n,$before[$n])}}}
 }
 Check 'Actual workflow setup retains failed diagnostics and success leaves runner output fresh' {
     if(-not$SetupTestRoot){
