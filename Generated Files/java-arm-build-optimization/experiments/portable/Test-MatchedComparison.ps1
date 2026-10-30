@@ -115,7 +115,38 @@ Check 'Every embedded workflow PowerShell block parses without execution' {
             $workflowRuns[$stepName]=$body -join "`n"
         }
     }
-    Require ($blocks-eq5) 'Expected five embedded evidence/setup/run blocks'
+    Require ($blocks-eq6) 'Expected six embedded evidence/JDK/setup/run blocks'
+}
+Check 'Actual pinned JDK downloader covers four native builds and rejects wrong digests without resolver' {
+    $tokens=$null;$errors=$null
+    $ast=[Management.Automation.Language.Parser]::ParseInput($workflowRuns['Fetch checksum-pinned official Microsoft JDK without resolver catalog'],[ref]$tokens,[ref]$errors)
+    $definitions=($ast.EndBlock.Statements|Where-Object {$_-is[Management.Automation.Language.FunctionDefinitionAst]}|ForEach-Object {$_.Extent.Text})-join"`n"
+    $saved=@{};foreach($n in 'GITHUB_WORKSPACE','GITHUB_OUTPUT','WORKLOAD'){$saved[$n]=[Environment]::GetEnvironmentVariable($n)}
+    try {
+        $root=if($SetupTestRoot){$SetupTestRoot}elseif($env:GITHUB_WORKSPACE){Join-Path $env:GITHUB_WORKSPACE 'comparison-owned/setup-evidence/mock-tests'}else{throw 'Specify -SetupTestRoot outside public payload'}
+        foreach($mode in 'current17','normalizedHobl25'){foreach($windows in $true,$false){
+            $case=Join-Path $root ('jdk-'+[guid]::NewGuid().ToString('N'));New-Item $case -ItemType Directory -Force|Out-Null
+            $env:GITHUB_WORKSPACE=$case;$env:GITHUB_OUTPUT=Join-Path $case 'outputs';$env:WORKLOAD=$mode
+            $module=New-Module -ArgumentList $definitions -ScriptBlock {
+                param($text)
+                . ([scriptblock]::Create($text))
+                function Invoke-WebRequest($Uri,$OutFile){'mock archive only'|Set-Content $OutFile}
+                function Get-FileHash($Path,$Algorithm){@{Hash=$script:expectedHash}}
+            }
+            $pin=& $module {param($w) Get-PinnedMicrosoftJdk $env:WORKLOAD $w} $windows
+            Require ($pin.name-match'aarch64' -and $pin.sha256.Length-eq64 -and $pin.url-like'https://aka.ms/download-jdk/*') 'Native publisher pin incomplete'
+            & $module {param($w,$hash) $script:expectedHash=$hash;Invoke-PinnedMicrosoftJdk $w} $windows $pin.sha256
+            $record=Get-Content (Join-Path $case 'comparison-owned/setup-evidence/jdk-archive.json') -Raw|ConvertFrom-Json
+            Require ($record.status-eq'PASS' -and $record.pin.build-in@('17.0.21.0.2','25.0.5.0.2')) 'Verified local-file handoff failed'
+            Remove-Item $env:GITHUB_OUTPUT
+            Rejects {& $module {param($w) $script:expectedHash='wrong';Invoke-PinnedMicrosoftJdk $w} $windows} 'checksum mismatch'
+            Require (-not(Test-Path $env:GITHUB_OUTPUT)) 'Unverified archive exported to setup-java'
+            $record=Get-Content (Join-Path $case 'comparison-owned/setup-evidence/jdk-archive.json') -Raw|ConvertFrom-Json
+            Require ($record.status-eq'FAIL' -and $record.scriptExitCode-eq1) 'JDK checksum failure evidence missing'
+        }}
+        $yaml=Get-Content (Join-Path $PSScriptRoot 'matched-comparison.workflow.yml') -Raw
+        Require ($yaml-match'distribution: jdkfile' -and $yaml-match'jdkFile: \$\{\{ steps.jdk_archive.outputs.jdkFile \}\}') 'Catalog resolver unexpectedly restored'
+    } finally {foreach($n in $saved.Keys){[Environment]::SetEnvironmentVariable($n,$saved[$n])}}
 }
 Check 'Actual workflow setup retains failed diagnostics and success leaves runner output fresh' {
     if(-not$SetupTestRoot){
@@ -153,7 +184,7 @@ Check 'Actual workflow setup retains failed diagnostics and success leaves runne
                 function Binary-Setup($path){@{format='MOCK';machine='0xAA64';fileVersion='mock-only';path=$path}}
                 function Add-SetupResource($jar,$dll){$script:mockResourceAdded=$true}
                 function Start-SetupProcess($file,$arguments,$log){
-                    if($file-match'java(?:\.exe)?$'){"java.runtime.version = 17.mock`njava.vendor = MOCK`nos.arch = aarch64"|Set-Content $log;return 0}
+                    if($file-match'java(?:\.exe)?$'){"java.runtime.version = 17.0.21.0.2+1-LTS`njava.vendor = Microsoft`nos.arch = aarch64"|Set-Content $log;return 0}
                     if($file-match'vswhere\.exe$'){
                         ''|Set-Content $log
                         if($fixtureCase-eq'native-failure'){return 23}
@@ -167,6 +198,9 @@ Check 'Actual workflow setup retains failed diagnostics and success leaves runne
                     }
                     'mock process success'|Set-Content $log;return 0
                 }
+                $mockSetup=Join-Path $env:GITHUB_WORKSPACE 'comparison-owned/setup-evidence'
+                New-Item $mockSetup -ItemType Directory -Force|Out-Null
+                @{pin=@{expectedRuntime='17.0.21.0.2+1-LTS'}}|ConvertTo-Json|Set-Content (Join-Path $mockSetup 'jdk-archive.json')
                 $script:fixtureCaught=$null;try{Invoke-ComparisonSetup -Windows $true}catch{$script:fixtureCaught=$_.Exception.Message}
             }
             $actual=& $module { [pscustomobject]@{state=$script:state;setup=$script:setup} }

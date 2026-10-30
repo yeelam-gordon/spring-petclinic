@@ -41,12 +41,51 @@ jobs:
           New-Item $setup -ItemType Directory -Force | Out-Null
           @{status='pending';stage='setup-java';nativeExitCode=$null;error=$null;jdk='not-observed';mvnd='not-observed';compiler='not-observed'} |
             ConvertTo-Json | Set-Content (Join-Path $setup 'setup.json')
+      - name: Fetch checksum-pinned official Microsoft JDK without resolver catalog
+        id: jdk_archive
+        env:
+          WORKLOAD: ${{ inputs.workload }}
+        run: |
+          $ErrorActionPreference='Stop'
+          function Get-PinnedMicrosoftJdk([string]$Workload,[bool]$Windows) {
+            $build=if($Workload-eq'current17'){'17.0.21.0.2'}elseif($Workload-eq'normalizedHobl25'){'25.0.5.0.2'}else{throw 'Unsupported workload'}
+            $os=if($Windows){'windows'}else{'macos'}
+            $ext=if($Windows){'zip'}else{'tar.gz'}
+            $hashes=@{
+              '17.0.21.0.2-windows'='2C0E7679022F1666DA64B586F9941E86481C6F369212E918BE3E505581085336'
+              '17.0.21.0.2-macos'='6BC0241428F9485A3AA8FCF606C8395C24A5FF0F6D5E9DAE2C70EAE410A3F5F3'
+              '25.0.5.0.2-windows'='F227CC459FBD65A42C1B28123D68E207EB500899C1C78238F21A038CD33688A3'
+              '25.0.5.0.2-macos'='C9CF199844411C8BAFD05722D2547538300523A63FF6207A440C71B175FF7873'
+            }
+            $name="microsoft-jdk-$build-$os-aarch64.$ext"
+            return @{name=$name;url="https://aka.ms/download-jdk/$name";sha256=$hashes["$build-$os"];build=$build;javaVersion=$(if($Workload-eq'current17'){'17.0.21'}else{'25.0.5'});expectedRuntime="$build+1-LTS";architecture='aarch64'}
+          }
+          function Invoke-PinnedMicrosoftJdk([bool]$Windows=$IsWindows) {
+            $owned=Join-Path $env:GITHUB_WORKSPACE 'comparison-owned'
+            $setup=Join-Path $owned 'setup-evidence'
+            New-Item $setup -ItemType Directory -Force|Out-Null
+            $pin=Get-PinnedMicrosoftJdk $env:WORKLOAD $Windows
+            $archive=Join-Path $owned $pin.name
+            $record=@{status='running';stage='jdk-download';nativeExitCode=$null;scriptExitCode=$null;pin=$pin;error=$null}
+            try{
+              $record|ConvertTo-Json -Depth 6|Set-Content (Join-Path $setup 'jdk-archive.json')
+              Invoke-WebRequest $pin.url -OutFile $archive
+              $record.stage='jdk-checksum';$record.actualSha256=(Get-FileHash $archive -Algorithm SHA256).Hash
+              if($record.actualSha256-ne$pin.sha256){throw 'Official JDK archive checksum mismatch'}
+              "jdkFile=$archive"|Add-Content $env:GITHUB_OUTPUT
+              "javaVersion=$($pin.javaVersion)"|Add-Content $env:GITHUB_OUTPUT
+              $record.status='PASS';$record.scriptExitCode=0
+            }catch{$record.status='FAIL';$record.scriptExitCode=1;$record.error=$_.Exception.Message;throw}
+            finally{$record|ConvertTo-Json -Depth 6|Set-Content (Join-Path $setup 'jdk-archive.json')}
+          }
+          Invoke-PinnedMicrosoftJdk
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
         id: java
         with:
-          distribution: microsoft
+          distribution: jdkfile
+          jdkFile: ${{ steps.jdk_archive.outputs.jdkFile }}
           architecture: aarch64
-          java-version: ${{ inputs.workload == 'current17' && '17.0.21' || '25.0.5' }}
+          java-version: ${{ steps.jdk_archive.outputs.javaVersion }}
           check-latest: false
       - name: Static protocol checks (no Java invoked)
         id: static
@@ -97,6 +136,8 @@ jobs:
           $identity=Native-Setup 'jdk-identity' $java @('-XshowSettings:properties','-version')
           $script:state.jdk=@{runtime=[regex]::Match($identity,'java.runtime.version = (.+)').Groups[1].Value.Trim();vendor=[regex]::Match($identity,'java.vendor = (.+)').Groups[1].Value.Trim();architecture=[regex]::Match($identity,'os.arch = (.+)').Groups[1].Value.Trim();javaHome=$env:JAVA_HOME}
           if($script:state.jdk.architecture-ne'aarch64'){throw 'Setup Java is not observed native aarch64'}
+          $pinnedJdk=Get-Content (Join-Path $script:setup 'jdk-archive.json') -Raw|ConvertFrom-Json
+          if($script:state.jdk.runtime-ne$pinnedJdk.pin.expectedRuntime -or $script:state.jdk.vendor-ne'Microsoft'){throw 'Actual runtime differs from pinned Microsoft archive build; possible tool-cache mismatch'}
           $flavor=if($Windows){'windows-amd64'}else{'darwin-aarch64'}
           $hash=if($Windows){'4DD97B1F26525055CEC960FB5B953B70D1E6606F96F5B096EFA932754FD3E9D0238E00CA97779368F29CB751F1776445C45DA618EA8D0D84692C3B936087309F'}else{'CC2887379788BFB54067DEE4F1E9E570624BE0BE6A73025CC59E24D3EE2525CC23D27FC33A58838A0F1A24CB75600FB0CD0AF3F730E70C2DA3660A9F6BF7DF3E'}
           $zip=Join-Path $owned 'vendor.zip'
@@ -172,6 +213,7 @@ jobs:
         env:
           CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
           JAVA_OUTCOME: ${{ steps.java.outcome }}
+          JDK_ARCHIVE_OUTCOME: ${{ steps.jdk_archive.outcome }}
           STATIC_OUTCOME: ${{ steps.static.outcome }}
           DRIVER_OUTCOME: ${{ steps.driver.outcome }}
         run: |
@@ -179,8 +221,8 @@ jobs:
           New-Item $setup -ItemType Directory -Force | Out-Null
           $path=Join-Path $setup 'setup.json'
           $state=if(Test-Path $path){Get-Content $path -Raw|ConvertFrom-Json -AsHashtable}else{@{status='not-observed';stage='initialization';nativeExitCode=$null;jdk='not-observed';mvnd='not-observed';compiler='not-observed'}}
-          $state.actionOutcomes=@{checkout=$env:CHECKOUT_OUTCOME;java=$env:JAVA_OUTCOME;static=$env:STATIC_OUTCOME;driver=$env:DRIVER_OUTCOME}
-          foreach($key in 'checkout','java','static','driver'){
+          $state.actionOutcomes=@{checkout=$env:CHECKOUT_OUTCOME;jdk_archive=$env:JDK_ARCHIVE_OUTCOME;java=$env:JAVA_OUTCOME;static=$env:STATIC_OUTCOME;driver=$env:DRIVER_OUTCOME}
+          foreach($key in 'checkout','jdk_archive','java','static','driver'){
             if($state.actionOutcomes[$key]-eq'failure'){
               if($state.status-ne'FAIL'){$state.status='FAIL';$state.stage=$key;$state.nativeExitCode=$null;$state.error="Action step $key failed; native exit not observed by this script; see that step log"}
               break
