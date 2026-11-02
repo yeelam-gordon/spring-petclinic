@@ -15,7 +15,7 @@ function SetPwshPilotArm([ValidateSet('baseline','candidate')][string]$Arm){
 function PilotPayload($Artifact){
     $map=[Collections.Generic.SortedDictionary[string,string]]::new([StringComparer]::Ordinal)
     foreach($entry in $Artifact.entries){
-        if($entry.name-notin@('BOOT-INF/classes/git.properties','META-INF/build-info.properties','META-INF/sbom/application.cdx.json')){$map.Add($entry.name,$entry.sha)}
+        if($entry.name-notin@('META-INF/MANIFEST.MF','BOOT-INF/classes/git.properties','META-INF/build-info.properties','META-INF/sbom/application.cdx.json')){$map.Add($entry.name,$entry.sha)}
     }
     return ,$map
 }
@@ -70,10 +70,53 @@ function ComparePilotBom($Actual,$Expected,[string]$ActualLabel,[string]$Expecte
     Require ($offline.offlineSbomSkipObserved-eq$true) 'Offline SBOM omission lacks logged requires-online skip'
     return ,@{entry='META-INF/sbom/application.cdx.json';classification='intentional online/offline omission with logged requires-online skip; not online content equivalence'}
 }
+function PilotManifest([string]$Label,$Artifact){
+    Require ($Artifact.online-is[bool]) 'Explicit manifest SBOM mode required'
+    $zip=[IO.Compression.ZipFile]::OpenRead("$Output\$Label.jar")
+    try{
+        $bytes=StreamBytes $zip.GetEntry('META-INF/MANIFEST.MF')
+        Require ([bool]$zip.GetEntry('META-INF/sbom/application.cdx.json')-eq$Artifact.online) 'Manifest mode differs from actual SBOM entry'
+    }finally{$zip.Dispose()}
+    if(-not$Artifact.online){Require ($Artifact.offlineSbomSkipObserved-eq$true) 'Manifest omission requires logged offline SBOM skip'}
+    $sections=[Collections.Generic.List[object]]::new();$section=[ordered]@{}
+    $names=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase);$previous=$null
+    foreach($line in ([Text.UTF8Encoding]::new($false,$true).GetString($bytes)-split'\r\n|\n|\r')){
+        if($line.Length-eq0){
+            if($section.Count){$sections.Add($section);$section=[ordered]@{};$names.Clear();$previous=$null}
+        }elseif($line.StartsWith(' ')){
+            Require ($null-ne$previous) 'Orphan manifest continuation';$section[$previous]+=$line.Substring(1)
+        }else{
+            $match=[regex]::Match($line,'^([A-Za-z0-9_-]+): (.*)$')
+            Require ($match.Success-and$names.Add($match.Groups[1].Value)) 'Malformed/duplicate manifest attribute'
+            $previous=$match.Groups[1].Value;$section[$previous]=$match.Groups[2].Value
+        }
+    }
+    if($section.Count){$sections.Add($section)}
+    Require ($sections.Count-gt0-and$sections[0].Contains('Manifest-Version')) 'Missing main manifest section'
+    foreach($attribute in @(@('Sbom-Location','META-INF/sbom/application.cdx.json'),@('Sbom-Format','CycloneDX'))){
+        if($Artifact.online){Require ($sections[0].Contains($attribute[0])-and$sections[0][$attribute[0]]-ceq$attribute[1]) 'Unexpected online SBOM manifest attribute'}
+        else{Require (-not$sections[0].Contains($attribute[0])) 'Offline manifest must omit only declared SBOM attributes'}
+    }
+    return @{sections=$sections.ToArray();rawSha256=(HashBytes $bytes)}
+}
+function ComparePilotManifest($Actual,$Expected,[string]$ActualLabel,[string]$ExpectedLabel){
+    $a=PilotManifest $ActualLabel $Actual;$b=PilotManifest $ExpectedLabel $Expected
+    $changes=@()
+    if($Actual.online-ne$Expected.online){
+        foreach($attribute in 'Sbom-Location','Sbom-Format'){
+            $actualPresent=$a.sections[0].Contains($attribute);$expectedPresent=$b.sections[0].Contains($attribute)
+            $changes+=@{entry='META-INF/MANIFEST.MF';attribute=$attribute;actualPresent=$actualPresent;actual=$a.sections[0][$attribute];referencePresent=$expectedPresent;reference=$b.sections[0][$attribute];actualRawSha256=$a.rawSha256;referenceRawSha256=$b.rawSha256;classification='exact SBOM attribute omission at proven online/offline boundary; raw bytes retained'}
+            $a.sections[0].Remove($attribute);$b.sections[0].Remove($attribute)
+        }
+    }
+    Same (CanonicalPilotJson $a.sections) (CanonicalPilotJson $b.sections) 'Meaningful manifest attributes/sections differ'
+    return $changes
+}
 function ComparePilotPayload($Actual,$Expected,[string]$ActualLabel,[string]$ExpectedLabel){
     foreach($field in 'classes','testClasses','dependencies'){Same $Actual[$field] $Expected[$field] "Required code/dependency bytes differ: $field"}
-    Same (PilotPayload $Actual) (PilotPayload $Expected) 'Required complete payload/resources differ'
     $changes=@(ComparePilotBom $Actual $Expected $ActualLabel $ExpectedLabel)
+    $changes+=@(ComparePilotManifest $Actual $Expected $ActualLabel $ExpectedLabel)
+    Same (PilotPayload $Actual) (PilotPayload $Expected) 'Required complete payload/resources differ'
     foreach($entry in 'BOOT-INF/classes/git.properties','META-INF/build-info.properties'){
         $changeCount=$changes.Count
         $a=PilotProperties $ActualLabel $entry;$b=PilotProperties $ExpectedLabel $entry

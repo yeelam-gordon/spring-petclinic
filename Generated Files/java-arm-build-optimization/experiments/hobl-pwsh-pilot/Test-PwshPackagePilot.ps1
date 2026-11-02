@@ -1,5 +1,5 @@
 #requires -Version 7.5
-param([Parameter(Mandatory)][string]$FixtureRoot,[switch]$IntentionalFailure,[string]$ReferenceReport,[string]$ReferenceBom)
+param([Parameter(Mandatory)][string]$FixtureRoot,[switch]$IntentionalFailure,[string]$ReferenceReport,[string]$ReferenceBom,[string]$ReferenceOnlineManifest,[string]$ReferenceOfflineManifest)
 $ErrorActionPreference='Stop';$PSNativeCommandUseErrorActionPreference=$false
 if($IntentionalFailure){throw 'Intentional genuine Actions-shell failure fixture'}
 . "$PSScriptRoot\Invoke-PwshPackagePilot.ps1" -Project 'owned-project' -Cache 'owned-cache' -JavaHome 'owned-jdk' -Output 'owned-output' -LibraryOnly
@@ -25,6 +25,7 @@ Check 'selector absent versus true and case-insensitive presence restoration' {
 Check 'real required payload map rejects resource or code changes' {
     function PilotProperties {param($Label,$EntryName) @{fixed='same';'build.time'='same'}}
     function ComparePilotBom {param($Actual,$Expected,$ActualLabel,$ExpectedLabel)}
+    function ComparePilotManifest {param($Actual,$Expected,$ActualLabel,$ExpectedLabel)}
     $expected=@{classes=@{C='1'};testClasses=@{T='1'};dependencies=@{D='1'};entries=@(@{name='BOOT-INF/classes/static/a.txt';sha='ABC'},@{name='META-INF/MANIFEST.MF';sha='DEF'},@{name='BOOT-INF/classes/git.properties';sha='mutable'})}
     $actual=@{classes=@{C='1'};testClasses=@{T='1'};dependencies=@{D='1'};entries=@(@{name='BOOT-INF/classes/static/a.txt';sha='ABC'},@{name='META-INF/MANIFEST.MF';sha='DEF'},@{name='BOOT-INF/classes/git.properties';sha='other'})}
     $expected.raw=@(@{name='BOOT-INF/classes/git.properties';sha='same'},@{name='META-INF/build-info.properties';sha='same'})
@@ -43,7 +44,9 @@ Check 'actual comparator preserves online BOM content and permits only classifie
     }
     Require ($bom.components.Count-eq108-and$bom.dependencies.Count-eq109) 'BOM fixture universe differs'
     function NewBomFixture([string]$Label,$Content,[bool]$Online,[bool]$Skip=$false){
-        $metadata=[ordered]@{'BOOT-INF/classes/git.properties'="git.commit.id=fixture`ngit.dirty=true";'META-INF/build-info.properties'='build.version=fixture'}
+        $manifest="Manifest-Version: 1.0`r`nMain-Class: fixture.Main`r`n"
+        if($Online){$manifest+="Sbom-Location: META-INF/sbom/application.cdx.json`r`nSbom-Format: CycloneDX`r`n"}
+        $metadata=[ordered]@{'META-INF/MANIFEST.MF'=($manifest+"`r`n");'BOOT-INF/classes/git.properties'="git.commit.id=fixture`ngit.dirty=true";'META-INF/build-info.properties'='build.version=fixture'}
         if($Online){$metadata['META-INF/sbom/application.cdx.json']=ConvertTo-Json -InputObject $Content -Depth 100}
         $zip=[IO.Compression.ZipFile]::Open("$Output\$Label.jar",[IO.Compression.ZipArchiveMode]::Create)
         $entries=@()
@@ -71,13 +74,46 @@ Check 'actual comparator preserves online BOM content and permits only classifie
     Same @($differences.path) @('serialNumber','metadata.timestamp') 'Allowed BOM differences not exactly classified'
     $offline=NewBomFixture offline $null $false $true
     $omission=@(ComparePilotPayload $offline $baseline offline baseline)
-    Require ($omission.Count-eq1-and$omission[0].classification-like'intentional online/offline omission*') 'Contract omission not classified'
+    Require (@($omission|Where-Object entry -eq 'META-INF/sbom/application.cdx.json').Count-eq1-and@($omission|Where-Object entry -eq 'META-INF/MANIFEST.MF').Count-eq2) 'Contract BOM/manifest omissions not exactly classified'
     $unproved=NewBomFixture unproved $null $false
     Reject {ComparePilotPayload $unproved $baseline unproved baseline}
     Reject {ComparePilotPayload $offline $unproved offline unproved}
     $wrongMode=NewBomFixture wrongmode $bom $true;$wrongMode.online=$false;$wrongMode.offlineSbomSkipObserved=$true
     Reject {ComparePilotPayload $wrongMode $baseline wrongmode baseline}
+    $script:manifestFixtureBom=$bom
     @{referenceKind=$(if($ReferenceBom){'real retained108/109 BOM'}else{'self-contained synthetic108/109 BOM'});referenceSha256=$(if($ReferenceBom){(Get-FileHash $ReferenceBom).Hash}else{$null});changedVersionRejected=$true;changedEdgeRejected=$true;allowedMetadata=$differences;offlineOmission=$omission}|ConvertTo-Json -Depth 15|Set-Content "$FixtureRoot\bom-regressions.json"
+}
+Check 'actual manifest comparator permits exactly the retained SBOM boundary and rejects unrelated headers' {
+    $Output=Join-Path $FixtureRoot 'manifest-fixtures';New-Item $Output -ItemType Directory|Out-Null
+    $offlineText="Manifest-Version: 1.0`r`nMain-Class: org.springframework.boot.loader.launch.JarLauncher`r`nStart-Class: org.springframework.samples.petclinic.PetClinicApplication`r`n`r`n"
+    $onlineText=$offlineText.Replace("`r`n`r`n","`r`nSbom-Location: META-INF/sbom/application.cdx.json`r`nSbom-Format: CycloneDX`r`n`r`n")
+    $onlineBytes=if($ReferenceOnlineManifest){[IO.File]::ReadAllBytes($ReferenceOnlineManifest)}else{[Text.Encoding]::UTF8.GetBytes($onlineText)}
+    $offlineBytes=if($ReferenceOfflineManifest){[IO.File]::ReadAllBytes($ReferenceOfflineManifest)}else{[Text.Encoding]::UTF8.GetBytes($offlineText)}
+    function NewManifestFixture([string]$Label,[byte[]]$Manifest,[bool]$Online,[bool]$Skip=$false){
+        $values=[ordered]@{'META-INF/MANIFEST.MF'=$Manifest;'BOOT-INF/classes/git.properties'=[Text.Encoding]::UTF8.GetBytes("git.commit.id=fixture`ngit.dirty=true");'META-INF/build-info.properties'=[Text.Encoding]::UTF8.GetBytes('build.version=fixture')}
+        if($Online){$values['META-INF/sbom/application.cdx.json']=[Text.Encoding]::UTF8.GetBytes((ConvertTo-Json -InputObject $script:manifestFixtureBom -Depth 100))}
+        $zip=[IO.Compression.ZipFile]::Open("$Output\$Label.jar",[IO.Compression.ZipArchiveMode]::Create);$entries=@()
+        try{foreach($key in $values.Keys){$s=$zip.CreateEntry($key).Open();try{$s.Write($values[$key])}finally{$s.Dispose()};$entries+=@{name=$key;sha=(HashBytes $values[$key])}}}finally{$zip.Dispose()}
+        return @{online=$Online;offlineSbomSkipObserved=$Skip;classes=@{C='same'};testClasses=@{T='same'};dependencies=@{D='same'};entries=$entries;raw=$entries}
+    }
+    $online=NewManifestFixture online $onlineBytes $true
+    $offline=NewManifestFixture offline $offlineBytes $false $true
+    $differences=@(ComparePilotPayload $offline $online offline online)
+    Same @($differences|Where-Object entry -eq 'META-INF/MANIFEST.MF'|ForEach-Object attribute) @('Sbom-Location','Sbom-Format') 'Boundary attributes not exactly classified'
+    Require (@(ComparePilotManifest $online $online online online).Count-eq0) 'Online same-mode semantics changed'
+    Require (@(ComparePilotManifest $offline $offline offline offline).Count-eq0) 'Offline same-mode semantics changed'
+    $text=[Text.Encoding]::UTF8.GetString($offlineBytes)
+    $main=NewManifestFixture main ([Text.Encoding]::UTF8.GetBytes($text.Replace('org.springframework.boot.loader.launch.JarLauncher','unexpected.Main'))) $false $true
+    Reject {ComparePilotPayload $main $online main online}
+    $extra=NewManifestFixture extra ([Text.Encoding]::UTF8.GetBytes($text.Replace("`r`n`r`n","`r`nUnexpected-Header: forbidden`r`n`r`n"))) $false $true
+    Reject {ComparePilotPayload $extra $online extra online}
+    $location=NewManifestFixture location ([Text.Encoding]::UTF8.GetBytes(([Text.Encoding]::UTF8.GetString($onlineBytes)).Replace('Sbom-Location: META-INF/sbom/application.cdx.json','Sbom-Location: META-INF/unexpected.json'))) $true
+    Reject {ComparePilotPayload $location $online location online}
+    $wrong=NewManifestFixture wrong $onlineBytes $true;$wrong.online=$false;$wrong.offlineSbomSkipObserved=$true
+    Reject {ComparePilotPayload $wrong $online wrong online}
+    $missing=NewManifestFixture missing $offlineBytes $false
+    Reject {ComparePilotPayload $missing $online missing online}
+    @{retainedManifests=[bool]($ReferenceOnlineManifest-and$ReferenceOfflineManifest);onlineSha256=(HashBytes $onlineBytes);offlineSha256=(HashBytes $offlineBytes);classifications=$differences;mainClassRejected=$true;extraHeaderRejected=$true;locationRejected=$true;wrongModeRejected=$true;missingSkipRejected=$true}|ConvertTo-Json -Depth 15|Set-Content "$FixtureRoot\manifest-regressions.json"
 }
 Check 'actual six-case loop: uniform normal clean outside timer, only offline package timed' {
     $before=GetBoundaryEnvironmentSnapshot
