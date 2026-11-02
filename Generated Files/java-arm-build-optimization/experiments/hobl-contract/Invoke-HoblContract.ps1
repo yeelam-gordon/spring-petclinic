@@ -84,6 +84,17 @@ function StreamBytes($Entry,[bool]$AllowEmpty=$false){
     Require (($AllowEmpty -or $bytes.Length-gt0) -and $bytes.Length-eq$Entry.Length) 'Empty/truncated required ZIP entry'
     return ,$bytes
 }
+function ResolveGitApplication([object[]]$Applications,[scriptblock]$IsFile={param($Path) Test-Path -LiteralPath $Path -PathType Leaf}){
+    Require ($Applications.Count-gt0) 'Git application absent from PATH'
+    $paths=@(foreach($application in $Applications){
+        Require ($application.CommandType-eq[Management.Automation.CommandTypes]::Application) 'Git resolver accepts applications only'
+        Require ($application.Source-is[string] -and -not[string]::IsNullOrWhiteSpace($application.Source)) 'Git application path is empty or not scalar'
+        [string]$application.Source
+    })
+    $selected=$paths[0]
+    Require (& $IsFile $selected) 'First PATH Git application is not an existing file'
+    return @{selectedPath=$selected;candidatePaths=$paths;selection='First Application in ordered PATH discovery; no alias/function or speed selection'}
+}
 if($LibraryOnly){return}
 Require ($ExclusiveSlotApproved -and $AcknowledgeContractReconstruction -and $LoopbackTests) 'Explicit runtime approval, reconstruction acknowledgement and loopback safety required'
 foreach($path in @($ProjectFullClone,$JavaHome,$LocalCache,$OutputDirectory)){Require (-not[string]::IsNullOrWhiteSpace($path)) 'Explicit clone/JDK/cache/fresh output required'}
@@ -112,7 +123,7 @@ $result=[ordered]@{
 }
 function Save {$result|ConvertTo-Json -Depth 45|Set-Content (Join-Path $OutputDirectory 'result.json') -Encoding utf8}
 function GitText([string[]]$Arguments){
-    $text=@(& (Get-Command git -CommandType Application).Source @Arguments);$code=$LASTEXITCODE;Require ($code-eq0) "Git failed $code";return ($text-join"`n")
+    $text=@(& $script:gitExecutable @Arguments);$code=$LASTEXITCODE;Require ($code-eq0) "Git failed $code";return ($text-join"`n")
 }
 function SourceGate{
     Require ((GitText @('-C',$ProjectFullClone,'rev-parse','HEAD'))-eq$result.pin) 'Wrong source pin'
@@ -194,6 +205,10 @@ function Snapshot([string]$Name,[bool]$Online){
 $saved=@{};foreach($name in 'JAVA_HOME','PATH'){$saved[$name]=[Environment]::GetEnvironmentVariable($name)}
 $pushed=$false
 try{
+    $result.gitApplication=ResolveGitApplication @(Get-Command git -All -CommandType Application -ErrorAction SilentlyContinue)
+    $script:gitExecutable=$result.gitApplication.selectedPath
+    $result.gitApplication.sha256=(Get-FileHash -LiteralPath $script:gitExecutable -Algorithm SHA256).Hash
+    Save
     SourceGate
     Require ((GitText @('-C',$ProjectFullClone,'rev-parse','--git-common-dir'))-eq'.git') 'Shared common Git directory rejected'
     Require (-not(Test-Path (Join-Path $ProjectFullClone '.git/objects/info/alternates'))) 'Borrowed Git objects rejected'

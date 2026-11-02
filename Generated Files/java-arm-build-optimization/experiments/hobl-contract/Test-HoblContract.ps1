@@ -193,5 +193,44 @@ Check 'complete production online/offline Snapshot preserves input labels and ex
         }
     }
 }
+Check 'actual Git resolver preserves PATH order, spaces and duplicates; rejects absent/invalid applications' {
+    foreach($case in @(
+        @{paths=@('owned git')},
+        @{paths=@('/opt/homebrew/bin/git','/usr/bin/git')},
+        @{paths=@('C:\Program Files\Git\bin\git.exe','C:\Program Files\Git\cmd\git.exe','C:\Program Files\Git\clangarm64\bin\git.exe')},
+        @{paths=@('duplicate git','duplicate git')}
+    )){
+        $paths=$case.paths
+        $applications=@($paths|ForEach-Object {[pscustomobject]@{Source=$_;CommandType=[Management.Automation.CommandTypes]::Application}})
+        $resolution=ResolveGitApplication $applications {param($Path) $true}
+        Same $resolution.selectedPath $paths[0] 'First ordered Git path not selected'
+        Same $resolution.candidatePaths $paths 'Candidate ordering/duplicates changed'
+    }
+    Reject {ResolveGitApplication @() {param($Path) $true}}
+    Reject {ResolveGitApplication @([pscustomobject]@{Source='';CommandType='Application'}) {param($Path) $true}}
+    Reject {ResolveGitApplication @([pscustomobject]@{Source=@('one','two');CommandType='Application'}) {param($Path) $true}}
+    Reject {ResolveGitApplication @([pscustomobject]@{Source='owned';CommandType='Function'}) {param($Path) $true}}
+    Reject {ResolveGitApplication @([pscustomobject]@{Source='missing';CommandType='Application'})}
+    Reject {ResolveGitApplication @([pscustomobject]@{Source=$FixtureRoot;CommandType='Application'})}
+}
+Check 'actual GitText and SourceGate retain argv boundaries and native failure propagation' {
+    foreach($functionName in 'GitText','SourceGate'){
+        $definition=$ast.Find({param($node)$node-is[Management.Automation.Language.FunctionDefinitionAst] -and $node.Name-eq$functionName},$true)
+        Invoke-Expression $definition.Extent.Text
+    }
+    $script:gitCalls=@();$script:gitMockExit=0
+    $ProjectFullClone='owned project with spaces';$result=@{pin='6feeae0f13e0e258eedc99832416b42bb13779b1'}
+    $script:gitExecutable={
+        $script:gitCalls+=,@($args)
+        $global:LASTEXITCODE=$script:gitMockExit
+        if($args[-1]-eq'HEAD'){'6feeae0f13e0e258eedc99832416b42bb13779b1'}
+    }
+    SourceGate
+    Same $script:gitCalls[0] @('-C','owned project with spaces','rev-parse','HEAD') 'Git arguments joined/split'
+    Require ($script:gitCalls.Count-eq2) 'Actual SourceGate did not query head and status'
+    $script:gitMockExit=19;$reason=$null
+    try{SourceGate}catch{$reason=$_.ToString()}
+    Require ($reason-eq'Git failed 19') 'Native Git failure was masked'
+}
 @{status='PASS';checks=$checks;javaInvoked=$false;runnerSha256=(Get-FileHash $runner).Hash}|ConvertTo-Json|Set-Content (Join-Path $FixtureRoot 'selftest.json')
 Write-Output "PASS $checks offline checks; zero Java/Maven"

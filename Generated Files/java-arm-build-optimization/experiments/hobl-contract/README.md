@@ -43,3 +43,16 @@ This invokes no Java/Maven/network. `hobl-contract.workflow.yml` is deliberately
 The template reuses pinned official JDK25 archive hashes/setup-java action and always-uploaded setup outcomes. Action-generated Maven credentials/settings are directed to a separate unused owned folder, not the baseline's user Maven settings. It needs no mvnd, JNI prototype, MSVC or driver download. It receipts/normalizes only the explicitly reviewed Windows image default `MAVEN_OPTS=-Xms256m` to the common empty baseline; unknown options fail. That is a reconstruction deviation, not an observed historical HOBL environment.
 
 Hosted hardware differs across OS and from physical DUTs. Actual runtime qualification of this new entrypoint, both-platform execution, general performance conclusions and any later optimization remain separately gated. Four public payload files live in this directory; private evidence is not a publication input.
+
+### Replaying this fork after validation settings are restored
+
+The published workflow lives on `perf/hobl-arm64-contract`. This investigation restores the fork's original default branch and Actions-disabled setting after validation; that does not remove the branch or its source.
+
+For another authorized run, the repository owner must:
+
+1. Temporarily enable repository Actions and make `perf/hobl-arm64-contract` the fork's default branch so GitHub can discover its manual workflow.
+2. Enable only `hobl-contract-arm64.yml`, dispatch it on that branch with the acknowledgement above, and approve the configured `hobl-contract-approval` environment.
+3. Wait for both platform jobs and artifact uploads to complete.
+4. Disable the benchmark workflow and restore the original default branch and Actions setting, leaving unrelated workflow states unchanged.
+
+These are fork-only administrative steps, not upstream changes or automatic spending authority.
