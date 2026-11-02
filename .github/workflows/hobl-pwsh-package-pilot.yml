@@ -1,0 +1,123 @@
+# Manual owned-fork package pilot; acknowledgement and owner gate required.
+name: Manual Windows HOBL preferred-pwsh package pilot
+on:
+  workflow_dispatch:
+    inputs:
+      acknowledgement:
+        description: Explicit approved Windows three-pair allocation
+        type: string
+        required: true
+      candidate_reviewed:
+        description: Independent candidate and pilot gates passed
+        type: boolean
+        required: true
+        default: false
+permissions:
+  contents: read
+jobs:
+  pilot:
+    if: github.repository == 'yeelam-gordon/spring-petclinic' && inputs.acknowledgement == 'I_HAVE_APPROVAL_AND_BUDGET' && inputs.candidate_reviewed
+    environment: hobl-contract-approval
+    timeout-minutes: 60
+    runs-on: windows-11-arm
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Pinned official native Microsoft JDK25
+        id: archive
+        run: |
+          $ErrorActionPreference='Stop'
+          $owned=Join-Path $env:GITHUB_WORKSPACE 'hobl-owned'
+          $setup=Join-Path $owned 'setup-evidence'
+          New-Item $setup -ItemType Directory -Force|Out-Null
+          $archive=Join-Path $owned 'microsoft-jdk-25.0.5.0.2-windows-aarch64.zip'
+          $r=@{status='pending';url='https://aka.ms/download-jdk/microsoft-jdk-25.0.5.0.2-windows-aarch64.zip';expectedSha256='F227CC459FBD65A42C1B28123D68E207EB500899C1C78238F21A038CD33688A3'}
+          try{
+            Invoke-WebRequest $r.url -OutFile $archive
+            $r.actualSha256=(Get-FileHash $archive).Hash
+            if($r.actualSha256-ne$r.expectedSha256){throw 'JDK checksum mismatch'}
+            "jdkFile=$archive"|Add-Content $env:GITHUB_OUTPUT
+            $r.status='PASS'
+          }catch{$r.status='FAIL';$r.error=$_.ToString();throw}
+          finally{$r|ConvertTo-Json|Set-Content (Join-Path $setup 'jdk-archive.json')}
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        id: java
+        with:
+          distribution: jdkfile
+          jdkFile: ${{ steps.archive.outputs.jdkFile }}
+          architecture: aarch64
+          java-version: '25.0.5'
+          check-latest: false
+          settings-path: ${{ github.workspace }}/hobl-owned/setup-java-settings
+      - name: Pure/tiny protocol checks
+        id: static
+        run: |
+          $ErrorActionPreference='Stop';$PSNativeCommandUseErrorActionPreference=$false
+          $owned=Join-Path $env:GITHUB_WORKSPACE 'hobl-owned'
+          & './Generated Files/java-arm-build-optimization/experiments/hobl-pwsh-pilot/Test-PwshPackagePilot.ps1' -FixtureRoot (Join-Path $owned 'static-fixtures')
+      - name: Ordinary pinned full clone
+        id: source
+        run: |
+          $ErrorActionPreference='Stop';$PSNativeCommandUseErrorActionPreference=$false
+          $owned=Join-Path $env:GITHUB_WORKSPACE 'hobl-owned'
+          $project=Join-Path $owned 'project'
+          & git -c core.autocrlf=false clone --no-checkout https://github.com/spring-projects/spring-petclinic.git $project *> (Join-Path $owned 'setup-evidence/clone.log')
+          if($LASTEXITCODE-ne0){throw "clone exit=$LASTEXITCODE"}
+          & git -C $project -c core.autocrlf=false checkout --detach 6feeae0f13e0e258eedc99832416b42bb13779b1 *> (Join-Path $owned 'setup-evidence/checkout.log')
+          if($LASTEXITCODE-ne0){throw "checkout exit=$LASTEXITCODE"}
+      - name: Same candidate bytes, classic-default versus explicit Core opt-in
+        id: samples
+        run: |
+          $ErrorActionPreference='Stop';$PSNativeCommandUseErrorActionPreference=$false
+          $owned=Join-Path $env:GITHUB_WORKSPACE 'hobl-owned'
+          $original=[Environment]::GetEnvironmentVariable('MAVEN_OPTS')
+          $empty=[string]::IsNullOrEmpty($original);$known=$original-ceq'-Xms256m'
+          $r=@{
+            observedOriginal=$(if($empty-or$known){$original}else{'[REDACTED_UNKNOWN]'})
+            originalSha256=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes([string]$original)))
+            source='https://github.com/actions/runner-images/blob/8b8c516342f24f47f3386c8f50acc3ec45337932/images/windows/scripts/build/Install-JavaTools.ps1'
+            imageOS=$env:ImageOS;imageVersion=$env:ImageVersion
+            decision=$(if($empty){'accept-empty'}elseif($known){'normalize exact reviewed Windows initial-heap default'}else{'reject-unknown'})
+            restored=$false
+          }
+          $path=Join-Path $owned 'setup-evidence/environment.json'
+          $r|ConvertTo-Json|Set-Content $path
+          if(-not$empty-and-not$known){throw 'Unknown MAVEN_OPTS rejected'}
+          try{
+            Remove-Item Env:MAVEN_OPTS -ErrorAction SilentlyContinue
+            & './Generated Files/java-arm-build-optimization/experiments/hobl-pwsh-pilot/Invoke-PwshPackagePilot.ps1' `
+              -Project (Join-Path $owned 'project') -Cache (Join-Path $owned 'm2') `
+              -JavaHome $env:JAVA_HOME -Output (Join-Path $owned 'evidence') `
+              -ExecuteAuthorized -CandidateReviewed
+          }finally{
+            if($null-eq$original){Remove-Item Env:MAVEN_OPTS -ErrorAction SilentlyContinue}else{[Environment]::SetEnvironmentVariable('MAVEN_OPTS',$original)}
+            $r.restored=([Environment]::GetEnvironmentVariable('MAVEN_OPTS')-ceq$original)
+            $r|ConvertTo-Json|Set-Content $path
+            if(-not$r.restored){throw 'MAVEN_OPTS presence/value restoration failed'}
+          }
+      - name: Always retain setup outcomes
+        if: always()
+        env:
+          ARCHIVE_OUTCOME: ${{ steps.archive.outcome }}
+          JAVA_OUTCOME: ${{ steps.java.outcome }}
+          STATIC_OUTCOME: ${{ steps.static.outcome }}
+          SOURCE_OUTCOME: ${{ steps.source.outcome }}
+          SAMPLES_OUTCOME: ${{ steps.samples.outcome }}
+        run: |
+          $setup=Join-Path $env:GITHUB_WORKSPACE 'hobl-owned/setup-evidence'
+          New-Item $setup -ItemType Directory -Force|Out-Null
+          @{archive=$env:ARCHIVE_OUTCOME;java=$env:JAVA_OUTCOME;static=$env:STATIC_OUTCOME;source=$env:SOURCE_OUTCOME;samples=$env:SAMPLES_OUTCOME} |
+            ConvertTo-Json|Set-Content (Join-Path $setup 'outcomes.json')
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: hobl-windows-preferred-pwsh-package-pilot
+          path: |
+            hobl-owned/setup-evidence
+            hobl-owned/static-fixtures
+            hobl-owned/evidence
+          if-no-files-found: error
