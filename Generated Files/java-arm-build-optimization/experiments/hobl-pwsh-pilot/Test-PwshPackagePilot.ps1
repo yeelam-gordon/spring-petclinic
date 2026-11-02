@@ -22,6 +22,60 @@ Check 'selector absent versus true and case-insensitive presence restoration' {
     $mixed=[Collections.Hashtable]::new([StringComparer]::Ordinal);$mixed.Add('path','owned')
     Require ((GetBoundaryEnvironmentSnapshot $mixed).Contains('PATH')) 'OrdinalIgnoreCase snapshot lost PATH'
 }
+Check 'actual revision selection and source guard pin both variants; no cross-variant or arbitrary hash' {
+    $prototype=PilotCandidateRevision
+    $upstream=PilotCandidateRevision UpstreamF62f442
+    Require ($prototype.revision-ceq'Prototype334'-and$prototype.expectedSha256-ceq'655A91268C8DE0B8B233492F49014F9F3975BCABE7B0B8B2DC5C22A8E26EAEBA') 'Default prototype changed'
+    AssertPilotCandidateFile $prototype;AssertPilotCandidateFile $upstream
+    Reject {AssertPilotCandidateFile (PilotCandidateRevision UpstreamF62f442 $prototype.path)}
+    Reject {AssertPilotCandidateFile (PilotCandidateRevision Prototype334 $upstream.path)}
+    Reject {PilotCandidateRevision arbitrary}
+    $bad=Join-Path $FixtureRoot 'wrong-bytes.cmd';[IO.File]::WriteAllText($bad,'fixture, never executed')
+    Reject {AssertPilotCandidateFile (PilotCandidateRevision UpstreamF62f442 $bad)}
+    $Project=Join-Path $FixtureRoot 'source-guard';New-Item $Project -ItemType Directory|Out-Null
+    function BoundaryGit([string[]]$Arguments){
+        if($Arguments[-1]-eq'HEAD'){return '6feeae0f13e0e258eedc99832416b42bb13779b1'}
+        if($Arguments-contains'status'){return ' M mvnw.cmd'}
+        if($Arguments[-1]-eq'origin'){return 'https://github.com/spring-projects/spring-petclinic.git'}
+        throw 'Unexpected source query'
+    }
+    function Get-FileHash([string]$Path,[string]$LiteralPath,[string]$Algorithm='SHA256'){
+        $selected=if($LiteralPath){$LiteralPath}else{$Path}
+        if($selected.EndsWith('pom.xml')){return @{Hash='A41D9CC2B0287AA03BCE5205171B111FD1620A4DD6DCF48D9624A189B50F1E0D'}}
+        Microsoft.PowerShell.Utility\Get-FileHash -LiteralPath $selected -Algorithm $Algorithm
+    }
+    Copy-Item $upstream.path "$Project\mvnw.cmd"
+    $candidateSpec=$upstream;PilotSource $true
+    $candidateSpec=$prototype;Reject {PilotSource $true}
+    Copy-Item $prototype.path "$Project\mvnw.cmd" -Force
+    $candidateSpec=$upstream;Reject {PilotSource $true}
+    $candidateSpec=$prototype;PilotSource $true
+    $workflow=Get-Content "$PSScriptRoot\pwsh-package.workflow.yml" -Raw
+    $branch=[regex]::Match($workflow,'(?s)\$revisionArgs=@\{\}.*?(?=\s+& ''\./Generated)').Value
+    Require ($branch.Length-gt0) 'Actual workflow selection block missing'
+    $environmentBefore=GetBoundaryEnvironmentSnapshot
+    try{
+        $env:CANDIDATE_REVISION='Prototype334'
+        $arguments=& ([scriptblock]::Create($branch+';return $revisionArgs'))
+        Require ($arguments.Count-eq0) 'Default workflow must omit explicit revision override'
+        $env:CANDIDATE_REVISION='UpstreamF62f442'
+        $arguments=& ([scriptblock]::Create($branch+';return $revisionArgs'))
+        Require ($arguments.CandidateRevision-ceq'UpstreamF62f442') 'Explicit upstream workflow override missing'
+        $env:CANDIDATE_REVISION='unknown';Reject {& ([scriptblock]::Create($branch))}
+    }finally{$restore=RestoreBoundaryEnvironment $environmentBefore @('CANDIDATE_REVISION');Require $restore.restored 'Workflow-selector environment not restored'}
+}
+Check 'upstream data survives Git cmd text/eol=crlf filter roundtrip' {
+    $root=Join-Path $FixtureRoot 'git-roundtrip';New-Item $root -ItemType Directory|Out-Null
+    [IO.File]::WriteAllText("$root\.gitattributes","*.cmd text eol=crlf`n")
+    $spec=PilotCandidateRevision UpstreamF62f442
+    Copy-Item $spec.path "$root\upstream-f62f442-mvnw.cmd"
+    & git -C $root init --quiet;Require ($LASTEXITCODE-eq0) 'Fixture git init failed'
+    & git -C $root -c core.autocrlf=false add -- .gitattributes upstream-f62f442-mvnw.cmd
+    Require ($LASTEXITCODE-eq0) 'Fixture Git filter add failed'
+    Remove-Item "$root\upstream-f62f442-mvnw.cmd"
+    & git -C $root checkout-index --force -- upstream-f62f442-mvnw.cmd
+    Require ($LASTEXITCODE-eq0-and(Get-FileHash "$root\upstream-f62f442-mvnw.cmd").Hash-eq$spec.expectedSha256) 'Rendered bytes changed on Git checkout'
+}
 Check 'real required payload map rejects resource or code changes' {
     function PilotProperties {param($Label,$EntryName) @{fixed='same';'build.time'='same'}}
     function ComparePilotBom {param($Actual,$Expected,$ActualLabel,$ExpectedLabel)}

@@ -12,6 +12,12 @@ on:
         type: boolean
         required: true
         default: false
+      candidate_revision:
+        description: Explicit source variant; upstream port requires its own review
+        type: choice
+        required: true
+        default: Prototype334
+        options: [Prototype334, UpstreamF62f442]
 permissions:
   contents: read
 jobs:
@@ -71,6 +77,8 @@ jobs:
           if($LASTEXITCODE-ne0){throw "checkout exit=$LASTEXITCODE"}
       - name: Same candidate bytes, classic-default versus explicit Core opt-in
         id: samples
+        env:
+          CANDIDATE_REVISION: ${{ inputs.candidate_revision }}
         run: |
           $ErrorActionPreference='Stop';$PSNativeCommandUseErrorActionPreference=$false
           $owned=Join-Path $env:GITHUB_WORKSPACE 'hobl-owned'
@@ -89,10 +97,13 @@ jobs:
           if(-not$empty-and-not$known){throw 'Unknown MAVEN_OPTS rejected'}
           try{
             Remove-Item Env:MAVEN_OPTS -ErrorAction SilentlyContinue
+            $revisionArgs=@{}
+            if($env:CANDIDATE_REVISION-eq'UpstreamF62f442'){$revisionArgs.CandidateRevision='UpstreamF62f442'}
+            elseif($env:CANDIDATE_REVISION-ne'Prototype334'){throw 'Unknown candidate revision'}
             & './Generated Files/java-arm-build-optimization/experiments/hobl-pwsh-pilot/Invoke-PwshPackagePilot.ps1' `
               -Project (Join-Path $owned 'project') -Cache (Join-Path $owned 'm2') `
               -JavaHome $env:JAVA_HOME -Output (Join-Path $owned 'evidence') `
-              -ExecuteAuthorized -CandidateReviewed
+              @revisionArgs -ExecuteAuthorized -CandidateReviewed
           }finally{
             if($null-eq$original){Remove-Item Env:MAVEN_OPTS -ErrorAction SilentlyContinue}else{[Environment]::SetEnvironmentVariable('MAVEN_OPTS',$original)}
             $r.restored=([Environment]::GetEnvironmentVariable('MAVEN_OPTS')-ceq$original)
@@ -115,7 +126,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: hobl-windows-preferred-pwsh-package-pilot
+          name: ${{ inputs.candidate_revision == 'UpstreamF62f442' && 'hobl-windows-preferred-pwsh-package-pilot-upstream-f62f442' || 'hobl-windows-preferred-pwsh-package-pilot' }}
           path: |
             hobl-owned/setup-evidence
             hobl-owned/static-fixtures

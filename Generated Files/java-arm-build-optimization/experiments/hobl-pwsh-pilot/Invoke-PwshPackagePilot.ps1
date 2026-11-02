@@ -1,12 +1,25 @@
 #requires -Version 7.5
 [CmdletBinding()]
 param([string]$Project,[string]$Cache,[string]$JavaHome,[string]$Output,
-    [string]$CandidateWrapper=(Join-Path $PSScriptRoot 'candidate-mvnw.cmd'),
+    [string]$CandidateWrapper,
+    [ValidateSet('Prototype334','UpstreamF62f442')][string]$CandidateRevision='Prototype334',
     [switch]$ExecuteAuthorized,[switch]$CandidateReviewed,[switch]$LibraryOnly)
 $ErrorActionPreference='Stop';$PSNativeCommandUseErrorActionPreference=$false
-$pilotInputs=@{Project=$Project;Cache=$Cache;JavaHome=$JavaHome;Output=$Output;CandidateWrapper=$CandidateWrapper;ExecuteAuthorized=[bool]$ExecuteAuthorized;CandidateReviewed=[bool]$CandidateReviewed;LibraryOnly=[bool]$LibraryOnly}
+$pilotInputs=@{Project=$Project;Cache=$Cache;JavaHome=$JavaHome;Output=$Output;CandidateWrapper=$CandidateWrapper;CandidateRevision=$CandidateRevision;ExecuteAuthorized=[bool]$ExecuteAuthorized;CandidateReviewed=[bool]$CandidateReviewed;LibraryOnly=[bool]$LibraryOnly}
 . "$PSScriptRoot\..\hobl-wrapper-diagnostic\Invoke-WrapperBoundary.ps1" -LibraryOnly
 foreach($item in $pilotInputs.GetEnumerator()){Set-Variable -Name $item.Key -Value $item.Value}
+function PilotCandidateRevision([ValidateSet('Prototype334','UpstreamF62f442')][string]$Revision='Prototype334',[string]$Path){
+    if($Revision-eq'Prototype334'){
+        $spec=@{revision=$Revision;file='candidate-mvnw.cmd';expectedSha256='655A91268C8DE0B8B233492F49014F9F3975BCABE7B0B8B2DC5C22A8E26EAEBA';wrapperVersion='3.3.4';provenance='Previously qualified retained HOBL prototype; unchanged default'}
+    }else{
+        $spec=@{revision=$Revision;file='upstream-f62f442-mvnw.cmd';expectedSha256='84D9DA5A6FE003DCACAA0D269FBA1BB4780D1BC49F97D36B6CC71D852CAD4FE9';wrapperVersion='3.3.5-SNAPSHOT';sourceCommit='f62f4422387ff1e4aa90b03de698893f83ba79ae';sourceResource='maven-wrapper-distribution/src/resources/only-mvnw.cmd';sourceResourceSha256='6B5933A5DF6AA7853EDFA80E3B4E06F70382E6FDD76484ECF57720A449785441';patchSha256='4438759FE3D0ECD2670A226F495AB410AA1BDD639FC7B8ECB5F2C160AA5B7366';render='ONLY @@project.version@@ -> 3.3.5-SNAPSHOT'}
+    }
+    $spec.path=if([string]::IsNullOrWhiteSpace($Path)){Join-Path $PSScriptRoot $spec.file}else{[IO.Path]::GetFullPath($Path)}
+    return $spec
+}
+function AssertPilotCandidateFile($Spec){
+    Require ((Get-FileHash -LiteralPath $Spec.path).Hash-eq$Spec.expectedSha256) "Candidate bytes do not match selected revision $($Spec.revision)"
+}
 function SetPwshPilotArm([ValidateSet('baseline','candidate')][string]$Arm){
     if($Arm-eq'baseline'){Remove-Item Env:MVNW_PREFER_PWSH -ErrorAction SilentlyContinue}
     else{[Environment]::SetEnvironmentVariable('MVNW_PREFER_PWSH','true','Process')}
@@ -151,7 +164,7 @@ function PilotSource([bool]$Dirty){
     Require ($(if($Dirty){$state-ceq' M mvnw.cmd'}else{[string]::IsNullOrEmpty($state)})) 'Unexpected source changes'
     Require ((Get-FileHash "$Project\pom.xml").Hash-eq'A41D9CC2B0287AA03BCE5205171B111FD1620A4DD6DCF48D9624A189B50F1E0D') 'Pinned POM changed'
     Require ((BoundaryGit @('-C',$Project,'remote','get-url','origin'))-eq'https://github.com/spring-projects/spring-petclinic.git') 'Wrong origin'
-    if($Dirty){Require ((Get-FileHash "$Project\mvnw.cmd").Hash-eq'655A91268C8DE0B8B233492F49014F9F3975BCABE7B0B8B2DC5C22A8E26EAEBA') 'Common candidate wrapper changed'}
+    if($Dirty){Require ((Get-FileHash "$Project\mvnw.cmd").Hash-eq$candidateSpec.expectedSha256) 'Common selected-revision wrapper changed'}
 }
 function PilotCall([string]$Label,[string[]]$Arguments,[bool]$Timed=$false){
     $log="$Output\$Label.log"
@@ -188,9 +201,11 @@ function PilotPreparation([string]$Arm){
 }
 if($LibraryOnly){return}
 Require ($IsWindows-and$ExecuteAuthorized-and$CandidateReviewed) 'Windows runtime and independently reviewed candidate must be explicitly authorized'
+$candidateSpec=PilotCandidateRevision $CandidateRevision $CandidateWrapper
+$CandidateWrapper=$candidateSpec.path
 AssertBoundaryPaths $Project $Output $Cache $JavaHome
 Require (-not(Test-Path $Output)) 'Fresh evidence required'
-Require ((Get-FileHash $CandidateWrapper).Hash-eq'655A91268C8DE0B8B233492F49014F9F3975BCABE7B0B8B2DC5C22A8E26EAEBA') 'Qualified candidate bytes required'
+AssertPilotCandidateFile $candidateSpec
 New-Item $Output -ItemType Directory|Out-Null
 $names=@('JAVA_HOME','PATH','MAVEN_OPTS','MAVEN_ARGS','JAVA_TOOL_OPTIONS','JDK_JAVA_OPTIONS','_JAVA_OPTIONS','MAVEN_SKIP_RC','JAVACMD','MAVEN_USER_HOME','MVNW_PREFER_PWSH')
 $before=GetBoundaryEnvironmentSnapshot;$cwd=(Get-Location).Path;$original=$null;$installed=$false;$pushed=$false
@@ -208,6 +223,9 @@ try{
     $record.sourcePin='6feeae0f13e0e258eedc99832416b42bb13779b1'
     $record.sourceTree=BoundaryGit @('-C',$Project,'rev-parse','HEAD^{tree}')
     $record.candidateSha256=(Get-FileHash $CandidateWrapper).Hash
+    $record.candidateRevision=$CandidateRevision
+    $record.candidateProvenance=$candidateSpec
+    if($CandidateRevision-eq'UpstreamF62f442'){$record.scope='EXACT current upstream f62f442 port, version-token-only3.3.5-SNAPSHOT render; Windows-only same-source classic/Core selector three-pair PACKAGE pilot; no Mac/default/HOBL-score claim'}
     $record.originalWrapperSha256=(HashBytes $original)
     $record.javaSha256=(Get-FileHash $java).Hash
     [IO.File]::WriteAllBytes($wrapper,[IO.File]::ReadAllBytes($CandidateWrapper));$installed=$true;PilotSource $true
@@ -238,7 +256,7 @@ try{
             Require ($log-match'BUILD SUCCESS'-and$log-match'0 Checkstyle violations'-and$log-match'Tests are skipped'-and$log-match'Compiling 30 source files'-and$log-match'Compiling 17 source files'-and$log-match'Goal makeAggregateBom requires online mode.*skipping') 'Required fresh package/check/test-compilation work absent'
             $label="pair-$pair-$arm";$artifact=PilotArtifact $label $false
             $changes=@(ComparePilotPayload $artifact $a.artifact $label 'baseline-online')
-            $sample=@{pair=$pair;arm=$arm;seconds=$phase.seconds;exitCode=$phase.exitCode;selectorPresent=(Test-Path Env:MVNW_PREFER_PWSH);selector=$env:MVNW_PREFER_PWSH;artifact=$artifact;metadataDifferences=$changes}
+            $sample=@{pair=$pair;arm=$arm;candidateRevision=$CandidateRevision;candidateSha256=$candidateSpec.expectedSha256;seconds=$phase.seconds;exitCode=$phase.exitCode;selectorPresent=(Test-Path Env:MVNW_PREFER_PWSH);selector=$env:MVNW_PREFER_PWSH;artifact=$artifact;metadataDifferences=$changes}
             $sample|ConvertTo-Json -Depth 20|Set-Content "$Output\$label-case.json";$record.samples+=,$sample;PilotSource $true
         }
     }
