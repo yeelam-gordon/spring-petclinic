@@ -44,15 +44,15 @@ The template reuses pinned official JDK25 archive hashes/setup-java action and a
 
 Hosted hardware differs across OS and from physical DUTs. Actual runtime qualification of this new entrypoint, both-platform execution, general performance conclusions and any later optimization remain separately gated. Four public payload files live in this directory; private evidence is not a publication input.
 
-### Replaying this fork after validation settings are restored
+### Replaying the stable fork CI
 
-The published workflow lives on `perf/hobl-arm64-contract`. This investigation restores the fork's original default branch and Actions-disabled setting after validation; that does not remove the branch or its source.
+The manual workflow is maintained on the fork's `main` as `.github/workflows/hobl-contract-baseline.yml`. Only benchmark infrastructure is added to that branch; application files and upstream are unchanged. No default-branch switching is needed.
 
 For another authorized run, the repository owner must:
 
-1. Temporarily enable repository Actions and make `perf/hobl-arm64-contract` the fork's default branch so GitHub can discover its manual workflow.
-2. Enable only `hobl-contract-arm64.yml`, dispatch it on that branch with the acknowledgement above, and approve the configured `hobl-contract-approval` environment.
+1. Enable repository Actions and only `hobl-contract-baseline.yml`; leave unrelated workflows disabled.
+2. Dispatch on `main` with the acknowledgement above, and approve the configured `hobl-contract-approval` environment.
 3. Wait for both platform jobs and artifact uploads to complete.
-4. Disable the benchmark workflow and restore the original default branch and Actions setting, leaving unrelated workflow states unchanged.
+4. Restore the prior Actions/workflow settings. Do not approve older zero-job provider records while validating a replacement.
 
-These are fork-only administrative steps, not upstream changes or automatic spending authority.
+These are fork-only administrative steps, not automatic spending authority. Source and local runtime qualification do not establish hosted execution or a Mac score; unresolved provider records remain separate evidence.
