@@ -1,0 +1,122 @@
+# INACTIVE: outside .github. Root separately reviews/publishes/authorizes.
+name: Manual Windows HOBL wrapper source diagnostic
+on:
+  workflow_dispatch:
+    inputs:
+      acknowledgement:
+        description: Explicit owner-approved Windows diagnostic allocation
+        type: string
+        required: true
+permissions:
+  contents: read
+jobs:
+  boundary:
+    if: github.repository == 'yeelam-gordon/spring-petclinic' && inputs.acknowledgement == 'I_HAVE_APPROVAL_AND_BUDGET'
+    environment: hobl-contract-approval
+    timeout-minutes: 60
+    runs-on: windows-11-arm
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Pinned official native Microsoft JDK25 archive
+        id: archive
+        run: |
+          $ErrorActionPreference='Stop'
+          $owned=Join-Path $env:GITHUB_WORKSPACE 'hobl-owned'
+          $setup=Join-Path $owned 'setup-evidence'
+          New-Item $setup -ItemType Directory -Force|Out-Null
+          $os=if($IsWindows){'windows'}else{'macos'}
+          $ext=if($IsWindows){'zip'}else{'tar.gz'}
+          $sha=if($IsWindows){'F227CC459FBD65A42C1B28123D68E207EB500899C1C78238F21A038CD33688A3'}else{'C9CF199844411C8BAFD05722D2547538300523A63FF6207A440C71B175FF7873'}
+          $name="microsoft-jdk-25.0.5.0.2-$os-aarch64.$ext"
+          $archive=Join-Path $owned $name
+          $receipt=@{status='pending';url="https://aka.ms/download-jdk/$name";expectedSha256=$sha;requestedOriginal='25.0.0.36';selected='25.0.5.0.2+1-LTS';deviation='Explicit matched reconstruction, not original DUT'}
+          try{
+            Invoke-WebRequest $receipt.url -OutFile $archive
+            $receipt.actualSha256=(Get-FileHash $archive).Hash
+            if($receipt.actualSha256-ne$sha){throw 'JDK checksum mismatch'}
+            "jdkFile=$archive"|Add-Content $env:GITHUB_OUTPUT
+            $receipt.status='PASS'
+          }catch{$receipt.status='FAIL';$receipt.error=$_.ToString();throw}
+          finally{$receipt|ConvertTo-Json|Set-Content (Join-Path $setup 'jdk-archive.json')}
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        id: java
+        with:
+          distribution: jdkfile
+          jdkFile: ${{ steps.archive.outputs.jdkFile }}
+          architecture: aarch64
+          java-version: '25.0.5'
+          check-latest: false
+          settings-path: ${{ github.workspace }}/hobl-owned/setup-java-settings
+      - name: Offline protocol tests and ordinary pinned clone
+        id: source
+        run: |
+          $ErrorActionPreference='Stop';$PSNativeCommandUseErrorActionPreference=$false
+          $owned=Join-Path $env:GITHUB_WORKSPACE 'hobl-owned'
+          & './Generated Files/java-arm-build-optimization/experiments/hobl-contract/Test-HoblContract.ps1' -FixtureRoot (Join-Path $owned 'static-fixtures')
+          & './Generated Files/java-arm-build-optimization/experiments/hobl-wrapper-diagnostic/Test-WrapperBoundary.ps1' -FixtureRoot (Join-Path $owned 'boundary-static-fixtures')
+          $project=Join-Path $owned 'project'
+          & git -c core.autocrlf=false clone --no-checkout https://github.com/spring-projects/spring-petclinic.git $project *> (Join-Path $owned 'setup-evidence/clone.log')
+          if($LASTEXITCODE-ne0){throw "clone exit=$LASTEXITCODE"}
+          & git -C $project -c core.autocrlf=false checkout --detach 6feeae0f13e0e258eedc99832416b42bb13779b1 *> (Join-Path $owned 'setup-evidence/checkout.log')
+          if($LASTEXITCODE-ne0){throw "checkout exit=$LASTEXITCODE"}
+      - name: Original-wrapper preparation then ONE marker-source offline package
+        id: diagnostic
+        run: |
+          $ErrorActionPreference='Stop'
+          $owned=Join-Path $env:GITHUB_WORKSPACE 'hobl-owned'
+          . './Generated Files/java-arm-build-optimization/experiments/hobl-wrapper-diagnostic/Invoke-WrapperBoundary.ps1' -LibraryOnly
+          $prior=[Environment]::GetEnvironmentVariables('Process')
+          $original=[Environment]::GetEnvironmentVariable('MAVEN_OPTS')
+          $empty=[string]::IsNullOrEmpty($original)
+          $known=$IsWindows -and $original-ceq'-Xms256m'
+          $receipt=@{
+            observedOriginal=$(if($empty-or$known){$original}else{'[REDACTED_UNKNOWN]'})
+            originalPresent=$prior.Contains('MAVEN_OPTS')
+            originalSha256=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes([string]$original)))
+            imageOS=$env:ImageOS;imageVersion=$env:ImageVersion
+            source='https://github.com/actions/runner-images/blob/8b8c516342f24f47f3386c8f50acc3ec45337932/images/windows/scripts/build/Install-JavaTools.ps1'
+            decision=$(if($empty){'accept-empty'}elseif($known){'explicit exact Windows image-default normalization to common empty baseline'}else{'reject-unknown'})
+            restored=$false
+          }
+          $path=Join-Path $owned 'setup-evidence/environment.json'
+          $receipt|ConvertTo-Json|Set-Content $path
+          try{
+            if(-not$empty-and-not$known){throw 'Unknown MAVEN_OPTS rejected, not silently unset'}
+            Remove-Item Env:MAVEN_OPTS -ErrorAction SilentlyContinue
+            & './Generated Files/java-arm-build-optimization/experiments/hobl-wrapper-diagnostic/Invoke-WrapperBoundary.ps1' `
+              -Project (Join-Path $owned 'project') -JavaHome $env:JAVA_HOME `
+              -Cache (Join-Path $owned 'm2') -Output (Join-Path $owned 'evidence') -ExecuteAuthorized
+          }finally{
+            $restore=RestoreBoundaryEnvironment $prior @('MAVEN_OPTS')
+            $receipt.restored=$restore.restored
+            $receipt.restoration=$restore
+            $receipt|ConvertTo-Json|Set-Content $path
+            if(-not$receipt.restored){throw 'MAVEN_OPTS restoration failed'}
+          }
+      - name: Retain setup outcomes even when an action failed
+        if: always()
+        env:
+          ARCHIVE_OUTCOME: ${{ steps.archive.outcome }}
+          JAVA_OUTCOME: ${{ steps.java.outcome }}
+          SOURCE_OUTCOME: ${{ steps.source.outcome }}
+          DIAGNOSTIC_OUTCOME: ${{ steps.diagnostic.outcome }}
+        run: |
+          $setup=Join-Path $env:GITHUB_WORKSPACE 'hobl-owned/setup-evidence'
+          New-Item $setup -ItemType Directory -Force|Out-Null
+          @{archive=$env:ARCHIVE_OUTCOME;java=$env:JAVA_OUTCOME;source=$env:SOURCE_OUTCOME;diagnostic=$env:DIAGNOSTIC_OUTCOME} |
+            ConvertTo-Json|Set-Content (Join-Path $setup 'outcomes.json')
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: hobl-wrapper-diagnostic-windows-11-arm-6feeae0-jdk25
+          path: |
+            hobl-owned/setup-evidence
+            hobl-owned/static-fixtures
+            hobl-owned/boundary-static-fixtures
+            hobl-owned/evidence
+          if-no-files-found: error
