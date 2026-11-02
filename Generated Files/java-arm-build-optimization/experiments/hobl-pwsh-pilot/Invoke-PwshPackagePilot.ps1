@@ -2,17 +2,27 @@
 [CmdletBinding()]
 param([string]$Project,[string]$Cache,[string]$JavaHome,[string]$Output,
     [string]$CandidateWrapper,
-    [ValidateSet('Prototype334','UpstreamF62f442')][string]$CandidateRevision='Prototype334',
+    [ValidateSet('Prototype334','UpstreamF62f442','UpstreamF62f442HttpsLicense')][string]$CandidateRevision='Prototype334',
     [switch]$ExecuteAuthorized,[switch]$CandidateReviewed,[switch]$LibraryOnly)
 $ErrorActionPreference='Stop';$PSNativeCommandUseErrorActionPreference=$false
 $pilotInputs=@{Project=$Project;Cache=$Cache;JavaHome=$JavaHome;Output=$Output;CandidateWrapper=$CandidateWrapper;CandidateRevision=$CandidateRevision;ExecuteAuthorized=[bool]$ExecuteAuthorized;CandidateReviewed=[bool]$CandidateReviewed;LibraryOnly=[bool]$LibraryOnly}
 . "$PSScriptRoot\..\hobl-wrapper-diagnostic\Invoke-WrapperBoundary.ps1" -LibraryOnly
 foreach($item in $pilotInputs.GetEnumerator()){Set-Variable -Name $item.Key -Value $item.Value}
-function PilotCandidateRevision([ValidateSet('Prototype334','UpstreamF62f442')][string]$Revision='Prototype334',[string]$Path){
+function PilotCandidateRevision([ValidateSet('Prototype334','UpstreamF62f442','UpstreamF62f442HttpsLicense')][string]$Revision='Prototype334',[string]$Path){
     if($Revision-eq'Prototype334'){
         $spec=@{revision=$Revision;file='candidate-mvnw.cmd';expectedSha256='655A91268C8DE0B8B233492F49014F9F3975BCABE7B0B8B2DC5C22A8E26EAEBA';wrapperVersion='3.3.4';provenance='Previously qualified retained HOBL prototype; unchanged default'}
     }else{
         $spec=@{revision=$Revision;file='upstream-f62f442-mvnw.cmd';expectedSha256='84D9DA5A6FE003DCACAA0D269FBA1BB4780D1BC49F97D36B6CC71D852CAD4FE9';wrapperVersion='3.3.5-SNAPSHOT';sourceCommit='f62f4422387ff1e4aa90b03de698893f83ba79ae';sourceResource='maven-wrapper-distribution/src/resources/only-mvnw.cmd';sourceResourceSha256='6B5933A5DF6AA7853EDFA80E3B4E06F70382E6FDD76484ECF57720A449785441';patchSha256='4438759FE3D0ECD2670A226F495AB410AA1BDD639FC7B8ECB5F2C160AA5B7366';render='ONLY @@project.version@@ -> 3.3.5-SNAPSHOT'}
+        if($Revision-eq'UpstreamF62f442HttpsLicense'){
+            $spec.file='upstream-f62f442-https-license-mvnw.cmd'
+            $spec.expectedSha256='AAA4957C5AB29267A0D89C03D33621740A4233BF25AFEB480797023687CABB7D'
+            $spec.parentRenderedSha256='84D9DA5A6FE003DCACAA0D269FBA1BB4780D1BC49F97D36B6CC71D852CAD4FE9'
+            $spec.httpsPolicyPatchSha256='876F9583F9103DB0C4EB58BB77DCE55511D679DD773B44BBB75D048D646C71B0'
+            $spec.policyDelta='Exactly one inherited Apache license URL scheme changed to HTTPS; all other rendered bytes unchanged'
+            $spec.render='Version-token-only parent84D9 render PLUS separately named one-line HTTPS license policy delta'
+            $spec.notExactOriginalPort=$true
+            $spec.localPolicyQualification='r3 unchanged offline validate: original HTTP1/specific NoHTTP11:10, HTTPS0/zero violations; not package/performance proof'
+        }
     }
     $spec.path=if([string]::IsNullOrWhiteSpace($Path)){Join-Path $PSScriptRoot $spec.file}else{[IO.Path]::GetFullPath($Path)}
     return $spec
@@ -226,6 +236,7 @@ try{
     $record.candidateRevision=$CandidateRevision
     $record.candidateProvenance=$candidateSpec
     if($CandidateRevision-eq'UpstreamF62f442'){$record.scope='EXACT current upstream f62f442 port, version-token-only3.3.5-SNAPSHOT render; Windows-only same-source classic/Core selector three-pair PACKAGE pilot; no Mac/default/HOBL-score claim'}
+    elseif($CandidateRevision-eq'UpstreamF62f442HttpsLicense'){$record.scope='SEPARATELY NAMED upstream f62f442 HTTPS-license consumer-policy variant, NOT exact original port; Windows-only same-source classic/Core three-pair PACKAGE screen; benefit UNKNOWN; no prototype gain transfer/Mac/default/HOBL-score claim'}
     $record.originalWrapperSha256=(HashBytes $original)
     $record.javaSha256=(Get-FileHash $java).Hash
     [IO.File]::WriteAllBytes($wrapper,[IO.File]::ReadAllBytes($CandidateWrapper));$installed=$true;PilotSource $true

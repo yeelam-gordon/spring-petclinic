@@ -17,7 +17,7 @@ on:
         type: choice
         required: true
         default: Prototype334
-        options: [Prototype334, UpstreamF62f442]
+        options: [Prototype334, UpstreamF62f442, UpstreamF62f442HttpsLicense]
 permissions:
   contents: read
 jobs:
@@ -99,6 +99,7 @@ jobs:
             Remove-Item Env:MAVEN_OPTS -ErrorAction SilentlyContinue
             $revisionArgs=@{}
             if($env:CANDIDATE_REVISION-eq'UpstreamF62f442'){$revisionArgs.CandidateRevision='UpstreamF62f442'}
+            elseif($env:CANDIDATE_REVISION-eq'UpstreamF62f442HttpsLicense'){$revisionArgs.CandidateRevision='UpstreamF62f442HttpsLicense'}
             elseif($env:CANDIDATE_REVISION-ne'Prototype334'){throw 'Unknown candidate revision'}
             & './Generated Files/java-arm-build-optimization/experiments/hobl-pwsh-pilot/Invoke-PwshPackagePilot.ps1' `
               -Project (Join-Path $owned 'project') -Cache (Join-Path $owned 'm2') `
@@ -126,7 +127,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: ${{ inputs.candidate_revision == 'UpstreamF62f442' && 'hobl-windows-preferred-pwsh-package-pilot-upstream-f62f442' || 'hobl-windows-preferred-pwsh-package-pilot' }}
+          name: ${{ inputs.candidate_revision == 'UpstreamF62f442HttpsLicense' && 'hobl-windows-preferred-pwsh-package-pilot-upstream-f62f442-https-license' || inputs.candidate_revision == 'UpstreamF62f442' && 'hobl-windows-preferred-pwsh-package-pilot-upstream-f62f442' || 'hobl-windows-preferred-pwsh-package-pilot' }}
           path: |
             hobl-owned/setup-evidence
             hobl-owned/static-fixtures

@@ -22,16 +22,22 @@ Check 'selector absent versus true and case-insensitive presence restoration' {
     $mixed=[Collections.Hashtable]::new([StringComparer]::Ordinal);$mixed.Add('path','owned')
     Require ((GetBoundaryEnvironmentSnapshot $mixed).Contains('PATH')) 'OrdinalIgnoreCase snapshot lost PATH'
 }
-Check 'actual revision selection and source guard pin both variants; no cross-variant or arbitrary hash' {
+Check 'actual revision selection and source guard pin all three variants; no cross-variant or arbitrary hash' {
     $prototype=PilotCandidateRevision
     $upstream=PilotCandidateRevision UpstreamF62f442
+    $https=PilotCandidateRevision UpstreamF62f442HttpsLicense
     Require ($prototype.revision-ceq'Prototype334'-and$prototype.expectedSha256-ceq'655A91268C8DE0B8B233492F49014F9F3975BCABE7B0B8B2DC5C22A8E26EAEBA') 'Default prototype changed'
-    AssertPilotCandidateFile $prototype;AssertPilotCandidateFile $upstream
+    AssertPilotCandidateFile $prototype;AssertPilotCandidateFile $upstream;AssertPilotCandidateFile $https
     Reject {AssertPilotCandidateFile (PilotCandidateRevision UpstreamF62f442 $prototype.path)}
     Reject {AssertPilotCandidateFile (PilotCandidateRevision Prototype334 $upstream.path)}
+    Reject {AssertPilotCandidateFile (PilotCandidateRevision UpstreamF62f442HttpsLicense $prototype.path)}
+    Reject {AssertPilotCandidateFile (PilotCandidateRevision UpstreamF62f442HttpsLicense $upstream.path)}
+    Reject {AssertPilotCandidateFile (PilotCandidateRevision Prototype334 $https.path)}
+    Reject {AssertPilotCandidateFile (PilotCandidateRevision UpstreamF62f442 $https.path)}
     Reject {PilotCandidateRevision arbitrary}
     $bad=Join-Path $FixtureRoot 'wrong-bytes.cmd';[IO.File]::WriteAllText($bad,'fixture, never executed')
     Reject {AssertPilotCandidateFile (PilotCandidateRevision UpstreamF62f442 $bad)}
+    Reject {AssertPilotCandidateFile (PilotCandidateRevision UpstreamF62f442HttpsLicense $bad)}
     $Project=Join-Path $FixtureRoot 'source-guard';New-Item $Project -ItemType Directory|Out-Null
     function BoundaryGit([string[]]$Arguments){
         if($Arguments[-1]-eq'HEAD'){return '6feeae0f13e0e258eedc99832416b42bb13779b1'}
@@ -47,9 +53,15 @@ Check 'actual revision selection and source guard pin both variants; no cross-va
     Copy-Item $upstream.path "$Project\mvnw.cmd"
     $candidateSpec=$upstream;PilotSource $true
     $candidateSpec=$prototype;Reject {PilotSource $true}
+    $candidateSpec=$https;Reject {PilotSource $true}
     Copy-Item $prototype.path "$Project\mvnw.cmd" -Force
     $candidateSpec=$upstream;Reject {PilotSource $true}
+    $candidateSpec=$https;Reject {PilotSource $true}
     $candidateSpec=$prototype;PilotSource $true
+    Copy-Item $https.path "$Project\mvnw.cmd" -Force
+    $candidateSpec=$https;PilotSource $true
+    $candidateSpec=$prototype;Reject {PilotSource $true}
+    $candidateSpec=$upstream;Reject {PilotSource $true}
     $workflow=Get-Content "$PSScriptRoot\pwsh-package.workflow.yml" -Raw
     $branch=[regex]::Match($workflow,'(?s)\$revisionArgs=@\{\}.*?(?=\s+& ''\./Generated)').Value
     Require ($branch.Length-gt0) 'Actual workflow selection block missing'
@@ -61,20 +73,25 @@ Check 'actual revision selection and source guard pin both variants; no cross-va
         $env:CANDIDATE_REVISION='UpstreamF62f442'
         $arguments=& ([scriptblock]::Create($branch+';return $revisionArgs'))
         Require ($arguments.CandidateRevision-ceq'UpstreamF62f442') 'Explicit upstream workflow override missing'
+        $env:CANDIDATE_REVISION='UpstreamF62f442HttpsLicense'
+        $arguments=& ([scriptblock]::Create($branch+';return $revisionArgs'))
+        Require ($arguments.CandidateRevision-ceq'UpstreamF62f442HttpsLicense') 'Explicit separately named HTTPS workflow override missing'
         $env:CANDIDATE_REVISION='unknown';Reject {& ([scriptblock]::Create($branch))}
     }finally{$restore=RestoreBoundaryEnvironment $environmentBefore @('CANDIDATE_REVISION');Require $restore.restored 'Workflow-selector environment not restored'}
 }
-Check 'upstream data survives Git cmd text/eol=crlf filter roundtrip' {
+Check 'both upstream data variants survive Git cmd text/eol=crlf filter roundtrip' {
     $root=Join-Path $FixtureRoot 'git-roundtrip';New-Item $root -ItemType Directory|Out-Null
     [IO.File]::WriteAllText("$root\.gitattributes","*.cmd text eol=crlf`n")
-    $spec=PilotCandidateRevision UpstreamF62f442
-    Copy-Item $spec.path "$root\upstream-f62f442-mvnw.cmd"
     & git -C $root init --quiet;Require ($LASTEXITCODE-eq0) 'Fixture git init failed'
-    & git -C $root -c core.autocrlf=false add -- .gitattributes upstream-f62f442-mvnw.cmd
-    Require ($LASTEXITCODE-eq0) 'Fixture Git filter add failed'
-    Remove-Item "$root\upstream-f62f442-mvnw.cmd"
-    & git -C $root checkout-index --force -- upstream-f62f442-mvnw.cmd
-    Require ($LASTEXITCODE-eq0-and(Get-FileHash "$root\upstream-f62f442-mvnw.cmd").Hash-eq$spec.expectedSha256) 'Rendered bytes changed on Git checkout'
+    foreach($revision in 'UpstreamF62f442','UpstreamF62f442HttpsLicense'){
+        $spec=PilotCandidateRevision $revision;$copy=Join-Path $root $spec.file
+        Copy-Item $spec.path $copy
+        & git -C $root -c core.autocrlf=false add -- .gitattributes $spec.file
+        Require ($LASTEXITCODE-eq0) 'Fixture Git filter add failed'
+        Remove-Item $copy
+        & git -C $root checkout-index --force -- $spec.file
+        Require ($LASTEXITCODE-eq0-and(Get-FileHash $copy).Hash-eq$spec.expectedSha256) 'Rendered bytes changed on Git checkout'
+    }
 }
 Check 'real required payload map rejects resource or code changes' {
     function PilotProperties {param($Label,$EntryName) @{fixed='same';'build.time'='same'}}
