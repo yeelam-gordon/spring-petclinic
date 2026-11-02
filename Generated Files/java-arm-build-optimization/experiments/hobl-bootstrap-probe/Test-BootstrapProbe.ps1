@@ -71,3 +71,5 @@ Require ($workflow-notmatch'Invoke-WrapperBoundary.ps1.*`|dependency:go-offline|
 $blocks=[regex]::Matches($workflow,'(?m)^        run: \|\r?\n(?<body>(?:          [^\r\n]*(?:\r?\n|$))+)');Require ($blocks.Count-eq4) 'Workflow blocks'
 foreach($b in $blocks){$e=$null;$t=$null;$null=[Management.Automation.Language.Parser]::ParseInput(([regex]::Replace($b.Groups['body'].Value,'(?m)^          ','')),[ref]$t,[ref]$e);Require ($e.Count-eq0) 'Workflow PowerShell syntax'}
 @{exit=0;originalReconstruction=$true;inlineFirst=$true;embeddedFirst=$true;cachedFirst=$true;identityDeferredAndBracketed=$true;selfMetadataOnly=$true;quotedPathSyntax=$true;fullEmbeddedSyntax=$true;negativeAnchorsPaths=$true;missingReversedClockUnknown=$true;metadataErrorNotDefault=$true;versionValidation=$true;exactly2VersionCallSites=$true;workflowSyntax=$true;tinyExits=@(7,7);realBootstrapOrJava=$false;childMetadataActuallyObserved=$false}|ConvertTo-Json|Set-Content "$FixtureRoot\results.json"
+# Expected nonzero native fixtures must not escape to the Actions shell.
+exit 0
