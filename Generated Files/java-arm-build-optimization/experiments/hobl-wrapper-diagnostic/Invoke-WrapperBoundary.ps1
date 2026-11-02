@@ -55,9 +55,21 @@ function AddBoundaryMarkers([byte[]]$Original,[string]$Destination){
     Require (($v.Replace($before+$nl,'').Replace($after+$nl,''))-ceq$t) 'Non-marker edit'
     return ,[Text.Encoding]::UTF8.GetBytes($v)
 }
+function GetBoundaryEnvironmentSnapshot([Collections.IDictionary]$Values){
+    Require $IsWindows 'Windows environment identity rules required'
+    if($null-eq$Values){$Values=[Environment]::GetEnvironmentVariables('Process')}
+    $snapshot=[Collections.Hashtable]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach($key in $Values.Keys){
+        Require (-not$snapshot.Contains([string]$key)) 'Ambiguous case-insensitive environment keys'
+        $snapshot.Add([string]$key,$Values[$key])
+    }
+    return $snapshot
+}
 function RestoreBoundaryEnvironment($Before,[string[]]$Names){
+    $Before=GetBoundaryEnvironmentSnapshot $Before
+    $null=GetBoundaryEnvironmentSnapshot
     $errors=@();foreach($n in $Names){try{if($Before.Contains($n)){[Environment]::SetEnvironmentVariable($n,$Before[$n],'Process')}elseif(Test-Path ('Env:'+$n)){Remove-Item ('Env:'+$n) -ErrorAction Stop}}catch{$errors+=$n}}
-    $after=[Environment]::GetEnvironmentVariables('Process')
+    $after=GetBoundaryEnvironmentSnapshot
     $keys=@(foreach($n in $Names){$a=$Before.Contains($n);$b=$after.Contains($n);@{name=$n;equal=($a-eq$b-and[string]::Equals($Before[$n],$after[$n],[StringComparison]::Ordinal));beforePresent=$a;afterPresent=$b;beforeType=$(if($a){$Before[$n].GetType().FullName}else{'null'});afterType=$(if($b){$after[$n].GetType().FullName}else{'null'});beforeLength=$(if($a){$Before[$n].Length}else{$null});afterLength=$(if($b){$after[$n].Length}else{$null});beforeSha=$(if($a){HashBytes ([Text.Encoding]::UTF8.GetBytes($Before[$n]))}else{$null});afterSha=$(if($b){HashBytes ([Text.Encoding]::UTF8.GetBytes($after[$n]))}else{$null})}})
     return @{restored=($errors.Count-eq0-and@($keys|Where-Object{-not$_.equal}).Count-eq0);keys=$keys;errors=$errors;unmanagedAdded=@($after.Keys|Where-Object{-not$Before.Contains($_)-and$_-notin$Names});unmanagedRemoved=@($Before.Keys|Where-Object{-not$after.Contains($_)-and$_-notin$Names})}
 }
@@ -102,7 +114,7 @@ Require (-not$Output.StartsWith($Project.TrimEnd('\')+'\',[StringComparison]::Or
 foreach($p in @($Cache,$JavaHome)){Require (-not$p.StartsWith($Project.TrimEnd('\')+'\',[StringComparison]::OrdinalIgnoreCase)) 'Cache/JDK must be outside source inputs'}
 New-Item $Output -ItemType Directory|Out-Null
 $names=@('JAVA_HOME','PATH','MAVEN_OPTS','MAVEN_ARGS','JAVA_TOOL_OPTIONS','JDK_JAVA_OPTIONS','_JAVA_OPTIONS','MAVEN_SKIP_RC','JAVACMD','MAVEN_USER_HOME')
-$before=[Environment]::GetEnvironmentVariables('Process');$cwd=(Get-Location).Path;$original=$null;$variant=$null;$pushed=$false
+$before=GetBoundaryEnvironmentSnapshot;$cwd=(Get-Location).Path;$original=$null;$variant=$null;$pushed=$false
 $record=@{status='STARTED';variant='source markers, not baseline/performance';failures=@();phases=@();host=@{pwsh=$PSVersionTable.PSVersion.ToString();os=[Runtime.InteropServices.RuntimeInformation]::OSDescription;processArchitecture=[Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString();osArchitecture=[Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString();logicalProcessors=[Environment]::ProcessorCount;imageOS=$env:ImageOS;imageVersion=$env:ImageVersion}}
 function BoundarySource([bool]$Dirty){
     Require ((BoundaryGit -Arguments @('-C',$Project,'rev-parse','HEAD'))-eq'6feeae0f13e0e258eedc99832416b42bb13779b1') 'Wrong pin'

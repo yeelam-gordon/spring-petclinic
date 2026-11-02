@@ -70,7 +70,7 @@ jobs:
           $ErrorActionPreference='Stop'
           $owned=Join-Path $env:GITHUB_WORKSPACE 'hobl-owned'
           . './Generated Files/java-arm-build-optimization/experiments/hobl-wrapper-diagnostic/Invoke-WrapperBoundary.ps1' -LibraryOnly
-          $prior=[Environment]::GetEnvironmentVariables('Process')
+          $prior=GetBoundaryEnvironmentSnapshot
           $original=[Environment]::GetEnvironmentVariable('MAVEN_OPTS')
           $empty=[string]::IsNullOrEmpty($original)
           $known=$IsWindows -and $original-ceq'-Xms256m'
@@ -84,7 +84,7 @@ jobs:
             restored=$false
           }
           $path=Join-Path $owned 'setup-evidence/environment.json'
-          $receipt|ConvertTo-Json|Set-Content $path
+          $receipt|ConvertTo-Json -Depth 10|Set-Content $path
           try{
             if(-not$empty-and-not$known){throw 'Unknown MAVEN_OPTS rejected, not silently unset'}
             Remove-Item Env:MAVEN_OPTS -ErrorAction SilentlyContinue
@@ -95,7 +95,7 @@ jobs:
             $restore=RestoreBoundaryEnvironment $prior @('MAVEN_OPTS')
             $receipt.restored=$restore.restored
             $receipt.restoration=$restore
-            $receipt|ConvertTo-Json|Set-Content $path
+            $receipt|ConvertTo-Json -Depth 10|Set-Content $path
             if(-not$receipt.restored){throw 'MAVEN_OPTS restoration failed'}
           }
       - name: Retain setup outcomes even when an action failed

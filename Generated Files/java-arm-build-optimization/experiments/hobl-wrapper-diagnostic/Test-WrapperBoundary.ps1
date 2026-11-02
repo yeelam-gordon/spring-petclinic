@@ -44,6 +44,33 @@ foreach($value in @('','normal-value')){
     try{[Environment]::SetEnvironmentVariable($name,$value,'Process');$state=[Environment]::GetEnvironmentVariables('Process');[Environment]::SetEnvironmentVariable($name,'changed','Process');$r=RestoreBoundaryEnvironment $state @($name);Require ($r.restored-and$r.keys[0].beforePresent-and$r.keys[0].afterPresent) 'Empty/normal presence restoration failed'}finally{if(Test-Path ('Env:'+$name)){Remove-Item ('Env:'+$name)}}
 }
 $failure=RestoreBoundaryEnvironment @{'INVALID=ENVIRONMENT'='fixture'} @('INVALID=ENVIRONMENT');Require (-not$failure.restored-and$failure.errors.Count-eq1) 'Restoration error hidden'
+$realPath=[Environment]::GetEnvironmentVariable('PATH','Process')
+$mixed='HoblCaseProbe_'+[Guid]::NewGuid().ToString('N');$upper=$mixed.ToUpperInvariant();$caseRows=@()
+try{
+    foreach($value in @('original-value','')){
+        [Environment]::SetEnvironmentVariable($mixed,$value,'Process');$raw=[Environment]::GetEnvironmentVariables('Process')
+        Require ($raw.Contains($mixed)-and-not$raw.Contains($upper)) 'Mixed-case fixture not actually case-sensitive in raw snapshot'
+        [Environment]::SetEnvironmentVariable($upper,'changed','Process')
+        $fixed=RestoreBoundaryEnvironment $raw @($upper)
+        $actual=GetBoundaryEnvironmentSnapshot
+        Require ($fixed.restored-and$fixed.keys[0].beforePresent-and$fixed.keys[0].afterPresent-and$actual.Contains($upper)-and[string]::Equals($actual[$upper],$value,[StringComparison]::Ordinal)) 'Mixed-case present/empty value lost or falsely restored'
+        $caseRows+=@{case=$(if($value.Length){'mixed-present'}else{'mixed-empty'});restoration=$fixed;actualValueRestored=$true}
+        Remove-Item ('Env:'+$mixed)
+    }
+    $absent=[Environment]::GetEnvironmentVariables('Process');[Environment]::SetEnvironmentVariable($mixed,'created','Process')
+    $fixed=RestoreBoundaryEnvironment $absent @($upper);$actual=GetBoundaryEnvironmentSnapshot
+    Require ($fixed.restored-and-not$actual.Contains($upper)-and-not$fixed.keys[0].beforePresent-and-not$fixed.keys[0].afterPresent) 'Mixed-case absent not restored'
+    $caseRows+=@{case='mixed-absent';restoration=$fixed;actualAbsenceRestored=$true}
+    [Environment]::SetEnvironmentVariable($mixed,'keep','Process')
+    foreach($second in @('other','keep')){
+        $ambiguous=[Collections.Hashtable]::new([StringComparer]::Ordinal);$ambiguous.Add($mixed,'keep');$ambiguous.Add($upper,$second)
+        $rejected=$false;try{$null=GetBoundaryEnvironmentSnapshot $ambiguous}catch{$rejected=$_.Exception.Message-eq'Ambiguous case-insensitive environment keys'};Require $rejected 'Ambiguous before/after input silently picked'
+        $rejected=$false;try{$null=RestoreBoundaryEnvironment $ambiguous @($upper)}catch{$rejected=$_.Exception.Message-eq'Ambiguous case-insensitive environment keys'}
+        Require ($rejected-and[Environment]::GetEnvironmentVariable($mixed,'Process')-ceq'keep') 'Ambiguous restore mutated process before rejection'
+    }
+}finally{if(Test-Path ('Env:'+$mixed)){Remove-Item ('Env:'+$mixed)}}
+Require ([string]::Equals($realPath,[Environment]::GetEnvironmentVariable('PATH','Process'),[StringComparison]::Ordinal)) 'Real PATH touched by disposable fixture'
+$caseRows|ConvertTo-Json -Depth 10|Set-Content "$FixtureRoot\environment-case-regressions.json"
 $tokens=$null;$errors=$null;$productionAst=[Management.Automation.Language.Parser]::ParseFile("$PSScriptRoot\Invoke-WrapperBoundary.ps1",[ref]$tokens,[ref]$errors);Require ($errors.Count-eq0) 'Runner syntax error'
 $blocked=$false;try{& "$PSScriptRoot\Invoke-WrapperBoundary.ps1" -Project 'fixture-project' -Cache 'fixture-cache' -JavaHome 'fixture-jdk' -Output "$FixtureRoot\must-not-exist"}catch{$blocked=$_.Exception.Message-like'Explicit owner authorization*'}
 Require ($blocked-and-not(Test-Path "$FixtureRoot\must-not-exist")) 'Authorization gate returned early or created runtime output'
@@ -98,6 +125,17 @@ Require (([regex]::Matches($workflow,'if: always\(\)')).Count-ge2) 'Outcomes/art
 $runBlocks=[regex]::Matches($workflow,'(?m)^        run: \|\r?\n(?<body>(?:          [^\r\n]*(?:\r?\n|$))+)')
 Require ($runBlocks.Count-eq4) 'Workflow run-block extraction incomplete'
 foreach($block in $runBlocks){$shell=[regex]::Replace($block.Groups['body'].Value,'(?m)^          ','');$e=$null;$t=$null;$null=[Management.Automation.Language.Parser]::ParseInput($shell,[ref]$t,[ref]$e);Require ($e.Count-eq0) 'Workflow inline PowerShell syntax error'}
+$serializers=@($workflow-split'\r?\n'|Where-Object{$_.TrimStart().StartsWith('$receipt|ConvertTo-Json')})
+Require ($serializers.Count-eq2-and$workflow.Contains('$prior=GetBoundaryEnvironmentSnapshot')) 'Workflow snapshot/depth integration missing'
+& {
+    foreach($line in $serializers){
+        $receipt=@{restoration=$caseRows[0].restoration};$path=Join-Path $FixtureRoot ('workflow-env-'+[Guid]::NewGuid().ToString('N')+'.json')
+        & ([scriptblock]::Create($line.Trim()))
+        $roundtrip=Get-Content $path -Raw|ConvertFrom-Json -DateKind String
+        Require ($roundtrip.restoration.keys[0].beforePresent-and$roundtrip.restoration.keys[0].afterPresent-and$roundtrip.restoration.keys[0].beforeType-eq'System.String') 'Workflow nested receipt collapsed/lost presence'
+        Require ((Get-Content $path -Raw)-notmatch'System.Collections.Hashtable') 'Workflow serialized hashtable name instead of keys'
+    }
+}
 & {
     $definition=$productionAst.Find({param($n)$n-is[Management.Automation.Language.FunctionDefinitionAst]-and$n.Name-eq'BoundarySource'},$true)
     Invoke-Expression $definition.Extent.Text
@@ -127,4 +165,4 @@ foreach($block in $runBlocks){$shell=[regex]::Replace($block.Groups['body'].Valu
     foreach($argv in $seen){Require ($argv[0]-ceq'-C'-and$argv[1]-ceq$Project) 'Git argv spacing/boundaries changed'}
     $rows|ConvertTo-Json -Depth 5|Set-Content "$FixtureRoot\git-query-regressions.json"
 }
-@{exit=0;fixture='builtins/pure XML/path/Git-provider tests only; no real wrapper bootstrap/Java';byteReconstruction=$true;nativeExits=@(7,7);literalIso=$true;presenceRestoration=@('absent','empty','normal','failure');parameterScope=$true;originalPrepOrder=$true;coverageShapeAndIdentityNegatives=$true;acceptedCoverageChecked=[bool]$ReferenceReport;pathIsolation=@('equal-cache','nested-cache','project-junction-ancestor','cache-junction-ancestor','jdk-junction-ancestor','output-junction-ancestor');workflowSetupExact=$true;workflowGatesAndRetention=$true;productionGitExitCases=10;syntaxErrors=0}|ConvertTo-Json -Depth 5|Set-Content "$FixtureRoot\results.json"
+@{exit=0;fixture='builtins/pure XML/path/Git-provider tests only; no real wrapper bootstrap/Java';byteReconstruction=$true;nativeExits=@(7,7);literalIso=$true;presenceRestoration=@('absent','empty','normal','failure');windowsCaseRestoration=@('mixed-present','mixed-empty','mixed-absent','ambiguous-different-values-rejected','ambiguous-equal-values-rejected');realPathUntouched=$true;workflowNestedSerialization=$true;parameterScope=$true;originalPrepOrder=$true;coverageShapeAndIdentityNegatives=$true;acceptedCoverageChecked=[bool]$ReferenceReport;pathIsolation=@('equal-cache','nested-cache','project-junction-ancestor','cache-junction-ancestor','jdk-junction-ancestor','output-junction-ancestor');workflowSetupExact=$true;workflowGatesAndRetention=$true;productionGitExitCases=10;syntaxErrors=0}|ConvertTo-Json -Depth 5|Set-Content "$FixtureRoot\results.json"
