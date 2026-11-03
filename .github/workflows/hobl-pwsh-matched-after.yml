@@ -1,5 +1,5 @@
-# Manual owned-fork paired after comparison; accepted Windows pilot required.
-name: Manual matched HOBL after - preferred Windows and fresh Mac
+# INACTIVE: outside .github. Root separately reviews/publishes/authorizes.
+name: INACTIVE matched after - preferred Windows and fresh default Mac
 on:
   workflow_dispatch:
     inputs:
@@ -12,6 +12,12 @@ on:
         description: Explicit approved two-platform five-loop allocation
         type: string
         required: true
+      windows_candidate_revision:
+        description: Explicit Windows policy variant; Mac original bash remains unchanged
+        type: choice
+        required: true
+        default: Prototype334
+        options: [Prototype334, UpstreamF62f442HttpsLicense]
 permissions:
   contents: read
 jobs:
@@ -79,13 +85,14 @@ jobs:
           if($LASTEXITCODE-ne0){throw 'Core patch failed'}
       - name: Five fresh matched scenarios - Windows opt-in only, Mac unchanged default
         id: scenarios
+        env:
+          WINDOWS_CANDIDATE_REVISION: ${{ inputs.windows_candidate_revision }}
         run: |
           $ErrorActionPreference='Stop'
           $owned=Join-Path $env:GITHUB_WORKSPACE 'hobl-owned'
-          if($IsWindows){
-            . './Generated Files/java-arm-build-optimization/experiments/hobl-wrapper-diagnostic/Invoke-WrapperBoundary.ps1' -LibraryOnly
-            $prior=GetBoundaryEnvironmentSnapshot
-          }
+          . './Generated Files/java-arm-build-optimization/experiments/hobl-contract/Invoke-HoblContract.ps1' -LibraryOnly
+          $managedEnvironmentNames=@('JAVA_HOME','PATH','MAVEN_OPTS','MAVEN_ARGS','JAVA_TOOL_OPTIONS','JDK_JAVA_OPTIONS','_JAVA_OPTIONS','MAVEN_SKIP_RC','JAVACMD','MAVEN_USER_HOME','MVNW_PREFER_PWSH')
+          $prior=GetMatchedEnvironmentSnapshot
           $original=[Environment]::GetEnvironmentVariable('MAVEN_OPTS')
           $empty=[string]::IsNullOrEmpty($original)
           $known=$IsWindows -and $original-ceq'-Xms256m'
@@ -100,18 +107,29 @@ jobs:
           $path=Join-Path $owned 'setup-evidence/environment.json'
           $receipt|ConvertTo-Json -Depth 10|Set-Content $path
           if(-not$empty-and-not$known){throw 'Unknown MAVEN_OPTS rejected, not silently unset'}
+          $innerFailure=$null
           try{
             Remove-Item Env:MAVEN_OPTS -ErrorAction SilentlyContinue
             & './Generated Files/java-arm-build-optimization/experiments/hobl-contract/Invoke-HoblContract.ps1' `
               -ProjectFullClone (Join-Path $owned 'project') -JavaHome $env:JAVA_HOME `
               -LocalCache (Join-Path $owned 'm2') -OutputDirectory (Join-Path $owned 'evidence') `
-              -ExclusiveSlotApproved -AcknowledgeContractReconstruction -LoopbackTests -WindowsPreferPwsh:$IsWindows
+              -ExclusiveSlotApproved -AcknowledgeContractReconstruction -LoopbackTests -WindowsPreferPwsh:$IsWindows `
+              -WindowsCandidateRevision $env:WINDOWS_CANDIDATE_REVISION
+          }catch{
+            $innerFailure=$_.ToString();$receipt.innerFailure=$innerFailure
           }finally{
-            if($IsWindows){$receipt.restoration=RestoreBoundaryEnvironment $prior @('MAVEN_OPTS');$receipt.restored=$receipt.restoration.restored}
-            else{if($null-eq$original){Remove-Item Env:MAVEN_OPTS -ErrorAction SilentlyContinue}else{[Environment]::SetEnvironmentVariable('MAVEN_OPTS',$original)};$receipt.restored=[string]::Equals([Environment]::GetEnvironmentVariable('MAVEN_OPTS'),$original,[StringComparison]::Ordinal)}
+            $innerReceipt=Join-Path $owned 'evidence/environment-restoration.json'
+            try{$receipt.innerRestoration=if(Test-Path $innerReceipt){Get-Content $innerReceipt -Raw|ConvertFrom-Json}else{$null}}catch{$receipt.innerReceiptFailure=$_.ToString()}
+            try{
+              $receipt.restoration=RestoreMatchedEnvironment $prior $managedEnvironmentNames
+              $receipt.restored=($receipt.restoration.restored-and$receipt.restoration.keys.Count-eq11)
+            }catch{$receipt.restored=$false;$receipt.outerRestorationFailure=$_.ToString()}
             $receipt|ConvertTo-Json -Depth 10|Set-Content $path
-            if(-not$receipt.restored){throw 'MAVEN_OPTS restoration failed'}
           }
+          $failures=@(@($innerFailure,$receipt.innerReceiptFailure,$receipt.outerRestorationFailure)|Where-Object {$_})
+          if(-not$receipt.restored){$failures+=@('Outer eleven-key environment restoration failed')}
+          if(-not$receipt.innerRestoration-or-not$receipt.innerRestoration.restored-or-not$receipt.innerRestoration.cwdEqual-or$receipt.innerRestoration.keys.Count-ne11){$failures+=@('Inner eleven-key/cwd receipt missing or failed')}
+          if($failures.Count){throw ($failures -join '; ')}
       - name: Retain setup outcomes even when an action failed
         if: always()
         env:
@@ -127,7 +145,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: hobl-matched-after-${{ matrix.runner }}-6feeae0-jdk25
+          name: ${{ inputs.windows_candidate_revision == 'UpstreamF62f442HttpsLicense' && 'hobl-https-matched-after' || 'hobl-matched-after' }}-${{ matrix.runner }}-6feeae0-jdk25
           path: |
             hobl-owned/setup-evidence
             hobl-owned/static-fixtures

@@ -1,8 +1,55 @@
-param([Parameter(Mandatory)][string]$FixtureRoot,[string]$Baseline=(Join-Path $PSScriptRoot '..\hobl-contract'),[string]$OriginalWrapper)
+param([Parameter(Mandatory)][string]$FixtureRoot,[string]$Baseline=(Join-Path $PSScriptRoot '..\hobl-contract'),[string]$OriginalWrapper,[switch]$EnvironmentChild,[string]$PatchedDriver)
 $ErrorActionPreference='Stop';$PSNativeCommandUseErrorActionPreference=$false
+if($EnvironmentChild){
+    New-Item $FixtureRoot -ItemType Directory|Out-Null
+    . $PatchedDriver -LibraryOnly
+    $tokens=$null;$errors=$null;$driverAst=[Management.Automation.Language.Parser]::ParseFile($PatchedDriver,[ref]$tokens,[ref]$errors)
+    Require ($errors.Count-eq0) 'Child driver syntax failed'
+    $namesNode=$driverAst.Find({param($n)$n-is[Management.Automation.Language.AssignmentStatementAst]-and$n.Extent.Text.StartsWith('$managedEnvironmentNames=@(')},$true)
+    . ([scriptblock]::Create($namesNode.Extent.Text))
+    Require ($managedEnvironmentNames.Count-eq11) 'Production managed set is not eleven'
+    $originalEnvironment=GetMatchedEnvironmentSnapshot
+    try{
+        [Environment]::SetEnvironmentVariable('MAVEN_ARGS','','Process')
+        Remove-Item Env:MVNW_PREFER_PWSH -ErrorAction SilentlyContinue
+        $before=GetMatchedEnvironmentSnapshot
+        if($IsWindows){
+            [Environment]::SetEnvironmentVariable('MAVEN_ARGS','old-scope-counterexample','Process')
+            $old=RestoreBoundaryEnvironment $before @('MAVEN_OPTS')
+            Require ($old.restored-and$env:MAVEN_ARGS-ceq'old-scope-counterexample') 'Original narrow counterexample not reproduced'
+            $null=RestoreMatchedEnvironment $before $managedEnvironmentNames
+        }
+        foreach($name in $managedEnvironmentNames){[Environment]::SetEnvironmentVariable($name,"inner-mutated-$name",'Process')}
+        if($IsWindows){[Environment]::SetEnvironmentVariable('pAtH','inner-mixed-case-path','Process')}
+        $saved=$before;$result=@{}
+        $restoreNode=$driverAst.Find({param($n)$n-is[Management.Automation.Language.AssignmentStatementAst]-and$n.Extent.Text.StartsWith('$result.environmentRestoration=RestoreMatchedEnvironment')},$true)
+        . ([scriptblock]::Create($restoreNode.Extent.Text))
+        Require ($result.environmentRestoration.restored-and$result.environmentRestoration.keys.Count-eq11-and@($result.environmentRestoration.keys|Where-Object {-not$_.equal}).Count-eq0) 'Actual inner production eleven-key restore failed'
+        Require ((Test-Path Env:MAVEN_ARGS)-and$env:MAVEN_ARGS-ceq''-and-not(Test-Path Env:MVNW_PREFER_PWSH)) 'Empty/absent state lost'
+        $workflow=Get-Content "$PSScriptRoot\matched-after.workflow.yml" -Raw
+        $outerNames=[regex]::Match($workflow,'(?m)^\s*\$managedEnvironmentNames=@\([^\r\n]+').Value
+        . ([scriptblock]::Create($outerNames))
+        foreach($name in $managedEnvironmentNames){[Environment]::SetEnvironmentVariable($name,"outer-mutated-$name",'Process')}
+        $prior=$before;$receipt=@{}
+        $outerRestore=[regex]::Match($workflow,'(?m)^\s*\$receipt\.restoration=RestoreMatchedEnvironment[^\r\n]+').Value
+        . ([scriptblock]::Create($outerRestore))
+        Require ($receipt.restoration.restored-and$receipt.restoration.keys.Count-eq11-and@($receipt.restoration.keys|Where-Object {-not$_.equal}).Count-eq0) 'Actual outer production eleven-key restore failed'
+        $proof=@{status='PASS';legacySubsetCounterexampleReproducedOnWindows=[bool]$IsWindows;actualInner=$result.environmentRestoration;actualOuter=$receipt.restoration;emptyMavenArgsPreserved=((Test-Path Env:MAVEN_ARGS)-and$env:MAVEN_ARGS-ceq'');absentPreferencePreserved=(-not(Test-Path Env:MVNW_PREFER_PWSH))}
+        $serialized=$proof|ConvertTo-Json -Depth 10;$roundtrip=$serialized|ConvertFrom-Json
+        Require ($roundtrip.actualInner.keys.Count-eq11-and$roundtrip.actualOuter.keys.Count-eq11-and$roundtrip.actualInner.keys[0].name) 'Depth10 nested serialized receipt lost concrete records'
+        $serialized|Set-Content "$FixtureRoot\eleven-key-proof.json"
+    }finally{
+        $finalRestore=RestoreMatchedEnvironment $originalEnvironment $managedEnvironmentNames
+        Require $finalRestore.restored 'Disposable child original environment not restored'
+    }
+    $global:LASTEXITCODE=0
+    return
+}
 if(Test-Path $FixtureRoot){throw 'Fresh owned fixtures required'}
 New-Item "$FixtureRoot\core" -ItemType Directory|Out-Null;$FixtureRoot=(Resolve-Path $FixtureRoot).Path
 Get-ChildItem $Baseline -File|Copy-Item -Destination "$FixtureRoot\core"
+New-Item "$FixtureRoot\hobl-wrapper-diagnostic" -ItemType Directory|Out-Null
+Copy-Item "$PSScriptRoot\..\hobl-wrapper-diagnostic\Invoke-WrapperBoundary.ps1" "$FixtureRoot\hobl-wrapper-diagnostic"
 $patch=(Resolve-Path "$PSScriptRoot\matched-after.patch").Path
 git -C $FixtureRoot init --quiet;if($LASTEXITCODE){throw 'Owned fixture Git init failed'}
 git -C $FixtureRoot apply --check --directory=core $patch;if($LASTEXITCODE){throw 'Patch check failed'}
@@ -14,6 +61,20 @@ $pom='A41D9CC2B0287AA03BCE5205171B111FD1620A4DD6DCF48D9624A189B50F1E0D'
 Require ((Get-FileHash "$PSScriptRoot\..\hobl-pwsh-pilot\candidate-mvnw.cmd").Hash-eq$sha) 'Public sibling qualification hash changed'
 AssertHoblSourceMode $true $true ' M mvnw.cmd' $sha $pom
 AssertHoblSourceMode $false $false '' '' ''
+$https='AAA4957C5AB29267A0D89C03D33621740A4233BF25AFEB480797023687CABB7D'
+Require ((Get-FileHash "$PSScriptRoot\..\hobl-pwsh-pilot\upstream-f62f442-https-license-mvnw.cmd").Hash-eq$https) 'HTTPS data drift'
+AssertHoblSourceMode $true $true ' M mvnw.cmd' $https $pom 'UpstreamF62f442HttpsLicense'
+$rejected=$false;try{AssertHoblSourceMode $true $true ' M mvnw.cmd' $sha $pom 'UpstreamF62f442HttpsLicense'}catch{$rejected=$true};Require $rejected 'Old prototype accepted as HTTPS'
+$rejected=$false;try{AssertHoblSourceMode $true $true ' M mvnw.cmd' $https $pom}catch{$rejected=$true};Require $rejected 'HTTPS accepted under old default'
+& {
+    function Get-Content {param($Path,[switch]$Raw) '<suppressions><suppress files="node_modules[\\/].*" checks=".*"/><suppress files="node[\\/].*" checks=".*"/><suppress files="build[\\/].*" checks=".*"/><suppress files="target[\\/].*" checks=".*"/><suppress files=".+\.(jar|git|ico|p12|gif|jks|jpg|svg|log)" checks="NoHttp"/></suppressions>'}
+    AssertHoblNoHttpPath (Join-Path ([IO.Path]::GetPathRoot($FixtureRoot)) 'owned-worktrees/project') $true
+    AssertHoblNoHttpPath (Join-Path ([IO.Path]::GetPathRoot($FixtureRoot)) 'owned-worktrees/project') $false
+    foreach($segment in 'build','target','node','node_modules'){
+        $blocked=$false;try{AssertHoblNoHttpPath (Join-Path ([IO.Path]::GetPathRoot($FixtureRoot)) "owned/$segment/project") $true}catch{$blocked=$true}
+        Require $blocked 'Suppressing source ancestry accepted'
+    }
+}
 $rejects=@()
 foreach($case in @(@{mode=$false;windows=$true;dirty=' M mvnw.cmd';hash=$sha;pom=$pom},@{mode=$true;windows=$false;dirty=' M mvnw.cmd';hash=$sha;pom=$pom},@{mode=$true;windows=$true;dirty=' M pom.xml';hash=$sha;pom=$pom},@{mode=$true;windows=$true;dirty=" M mvnw.cmd`n?? other";hash=$sha;pom=$pom},@{mode=$true;windows=$true;dirty=' M mvnw.cmd';hash='wrong';pom=$pom},@{mode=$true;windows=$true;dirty=' M mvnw.cmd';hash=$sha;pom='wrong'})){
     $rejected=$false;try{AssertHoblSourceMode $case.mode $case.windows $case.dirty $case.hash $case.pom}catch{$rejected=$true}
@@ -32,21 +93,25 @@ Require ($oldLoop.Extent.Text-ceq$newLoop.Extent.Text) 'Five-loop scenarios chan
 & {
     foreach($name in 'GitText','SourceGate'){$f=$newAst.Find({param($n)$n-is[Management.Automation.Language.FunctionDefinitionAst]-and$n.Name-eq$name},$true);Invoke-Expression $f.Extent.Text}
     $ProjectFullClone='owned fake project';$result=@{pin='6feeae0f13e0e258eedc99832416b42bb13779b1'}
-    function Get-FileHash {param($Path) [pscustomobject]@{Hash=$(if($Path.EndsWith('pom.xml')){$pom}else{$sha})}}
+    function Get-FileHash {param($Path) [pscustomobject]@{Hash=$(if($Path.EndsWith('pom.xml')){$pom}else{$script:fixtureWrapperHash})}}
     $script:gitExecutable={if($args[-1]-eq'HEAD'){'6feeae0f13e0e258eedc99832416b42bb13779b1'}else{if($script:preferActive){' M mvnw.cmd'}};$global:LASTEXITCODE=0}
     $prior=[Environment]::GetEnvironmentVariable('MVNW_PREFER_PWSH')
     try{
+        $script:fixtureWrapperHash=$sha;$script:preferRevision='Prototype334'
         $script:preferActive=$false;SourceGate
         $script:preferActive=$true;$env:MVNW_PREFER_PWSH='true'
         if($IsWindows){
             SourceGate
+            $script:preferRevision='UpstreamF62f442HttpsLicense';$script:fixtureWrapperHash=$https;SourceGate
+            $script:fixtureWrapperHash=$sha;$rejected=$false;try{SourceGate}catch{$rejected=$true};Require $rejected 'Actual HTTPS SourceGate accepted prototype bytes'
+            $script:preferRevision='Prototype334';$script:fixtureWrapperHash=$sha
             $env:MVNW_PREFER_PWSH='false';$rejected=$false;try{SourceGate}catch{$rejected=$true};Require $rejected 'Selector loss accepted'
         }else{
             $rejected=$false;try{SourceGate}catch{$rejected=$_.Exception.Message-eq'Preferred pwsh mode is Windows-only'}
             Require $rejected 'Non-Windows preferred mode did not reject'
         }
     }
-    finally{$script:preferActive=$false;if($null-eq$prior){Remove-Item Env:MVNW_PREFER_PWSH -ErrorAction SilentlyContinue}else{[Environment]::SetEnvironmentVariable('MVNW_PREFER_PWSH',$prior)}}
+    finally{$script:preferActive=$false;$script:preferRevision='Prototype334';if($null-eq$prior){Remove-Item Env:MVNW_PREFER_PWSH -ErrorAction SilentlyContinue}else{[Environment]::SetEnvironmentVariable('MVNW_PREFER_PWSH',$prior)}}
 }
 $core=Get-Content $runner -Raw
 Require ($core.Contains("`$expectedDirty=if(`$script:preferActive){'true'}else{'false'}")) 'Git dirty metadata mode missing'
@@ -68,28 +133,24 @@ if($OriginalWrapper){
     & {
         $script:wrapper=Join-Path $FixtureRoot 'restore-wrapper.cmd';$preferOriginalBytes=$originalBytes;$restoreErrors=@();$result=@{}
         Copy-Item "$PSScriptRoot\..\hobl-pwsh-pilot\candidate-mvnw.cmd" $script:wrapper
-        $script:preferActive=$true;. ([scriptblock]::Create($restoreNode.Extent.Text))
+        $script:preferRevision='Prototype334';$script:preferActive=$true;. ([scriptblock]::Create($restoreNode.Extent.Text))
         Require ($restoreErrors.Count-eq0-and-not$script:preferActive-and(Get-FileHash $script:wrapper).Hash-eq'5DDDBC06B22E26410B82AA17181510058D58319DED13E1822D6D784196582F1A') 'Actual source restoration failed'
+        Copy-Item "$PSScriptRoot\..\hobl-pwsh-pilot\upstream-f62f442-https-license-mvnw.cmd" $script:wrapper -Force
+        $script:preferRevision='UpstreamF62f442HttpsLicense';$script:preferActive=$true;$restoreErrors=@()
+        . ([scriptblock]::Create($restoreNode.Extent.Text))
+        Require ($restoreErrors.Count-eq0-and-not$script:preferActive-and(Get-FileHash $script:wrapper).Hash-eq'5DDDBC06B22E26410B82AA17181510058D58319DED13E1822D6D784196582F1A') 'HTTPS source restoration failed'
         [IO.File]::WriteAllText($script:wrapper,'unexpected owned fixture');$restoreErrors=@();$script:preferActive=$true
         . ([scriptblock]::Create($restoreNode.Extent.Text))
         Require ($restoreErrors.Count-eq1-and[IO.File]::ReadAllText($script:wrapper)-ceq'unexpected owned fixture') 'Unexpected source overwritten'
-        $script:preferActive=$false
+        $script:preferActive=$false;$script:preferRevision='Prototype334'
     }
 }
-$restoreEnv=$newAst.Find({param($n)$n-is[Management.Automation.Language.ForEachStatementAst]-and$n.Extent.Text.StartsWith('foreach($name in $saved.Keys)')},$true)
-Require $restoreEnv 'Production environment-restore block missing'
-$priorSelector=[Environment]::GetEnvironmentVariable('MVNW_PREFER_PWSH')
-try{
-    foreach($value in @($null,'','prior-value')){
-        if($null-eq$value){Remove-Item Env:MVNW_PREFER_PWSH -ErrorAction SilentlyContinue}else{[Environment]::SetEnvironmentVariable('MVNW_PREFER_PWSH',$value)}
-        $saved=@{MVNW_PREFER_PWSH=[Environment]::GetEnvironmentVariable('MVNW_PREFER_PWSH')};$restoreErrors=@();$env:MVNW_PREFER_PWSH='true'
-        . ([scriptblock]::Create($restoreEnv.Extent.Text))
-        Require ($restoreErrors.Count-eq0-and[string]::Equals($saved.MVNW_PREFER_PWSH,[Environment]::GetEnvironmentVariable('MVNW_PREFER_PWSH'),[StringComparison]::Ordinal)) 'Actual selector absence/empty/value restore failed'
-    }
-}finally{if($null-eq$priorSelector){Remove-Item Env:MVNW_PREFER_PWSH -ErrorAction SilentlyContinue}else{[Environment]::SetEnvironmentVariable('MVNW_PREFER_PWSH',$priorSelector)}}
-& (Get-Command pwsh).Source -NoProfile -File "$FixtureRoot\core\Test-HoblContract.ps1" -FixtureRoot "$FixtureRoot\original17" *> "$FixtureRoot\original17.log"
+& (Get-Process -Id $PID).Path -NoProfile -File $PSCommandPath -FixtureRoot "$FixtureRoot\environment-child" -EnvironmentChild -PatchedDriver $runner *> "$FixtureRoot\environment-child.log"
+Require ($LASTEXITCODE-eq0) 'Isolated child actual eleven-key production restoration failed'
+& (Get-Process -Id $PID).Path -NoProfile -File "$FixtureRoot\core\Test-HoblContract.ps1" -FixtureRoot "$FixtureRoot\original17" *> "$FixtureRoot\original17.log"
 Require ($LASTEXITCODE-eq0) 'Original17 static suite failed against patched copy'
 $workflow=Get-Content "$PSScriptRoot\matched-after.workflow.yml" -Raw
 Require ($workflow.Contains('runner: [windows-11-arm, macos-15]')-and$workflow.Contains('-WindowsPreferPwsh:$IsWindows')-and$workflow.Contains('inputs.windows_benefit_reviewed')-and$workflow.Contains('environment: hobl-contract-approval')) 'Matched manual platform gate missing'
-@{exit=0;patchApply=$true;syntax=$true;positiveMode=$true;negativeCases=$rejects;actualSourceGateBothModes=$true;hostWindows=[bool]$IsWindows;preferredProductionExpectation=$(if($IsWindows){'success-and-selector-loss-rejection'}else{'Windows-only-rejection'});defaultProductionExpectation='success';macTimerArgvFiveLoopAstUnchanged=$true;original17Exit=0;javaMavenBootstrap=$false}|ConvertTo-Json -Depth 6|Set-Content "$FixtureRoot\results.json"
+Require ($workflow.Contains('default: Prototype334')-and$workflow.Contains('UpstreamF62f442HttpsLicense')-and$workflow.Contains('-WindowsCandidateRevision $env:WINDOWS_CANDIDATE_REVISION')) 'Explicit HTTPS paired-cohort input missing'
+@{exit=0;patchApply=$true;syntax=$true;positiveMode=$true;httpsCandidateSha256=$https;httpsPositiveAndCrossVariantRejection=$true;noHttpAncestryPositiveNegative=$true;httpsOriginalWrapperRestoration=$true;elevenKeyActualInnerOuterChildExit=0;depth10ConcreteReceipts=$true;negativeCases=$rejects;actualSourceGateBothModes=$true;hostWindows=[bool]$IsWindows;preferredProductionExpectation=$(if($IsWindows){'success-and-selector-loss-rejection'}else{'Windows-only-rejection'});defaultProductionExpectation='success';macTimerArgvFiveLoopAstUnchanged=$true;original17Exit=0;javaMavenBootstrap=$false}|ConvertTo-Json -Depth 6|Set-Content "$FixtureRoot\results.json"
 $global:LASTEXITCODE=0
