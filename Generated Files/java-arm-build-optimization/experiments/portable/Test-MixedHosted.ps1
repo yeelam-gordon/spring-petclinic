@@ -5,9 +5,10 @@ $workflow=Get-Content (Join-Path $root 'mixed-client-package.workflow.yml') -Raw
 if(Get-Command ConvertFrom-Yaml -ErrorAction SilentlyContinue){
     $yaml=$workflow|ConvertFrom-Yaml
     if($yaml.jobs.Count-ne1-or$yaml.jobs.paired.strategy.matrix.include.Count-ne2-or$yaml.jobs.paired.'timeout-minutes'-ne60-or$yaml.jobs.paired.strategy.'fail-fast'-ne$false){throw 'Wrong paired job budget'}
+    if((@($yaml.jobs.paired.strategy.matrix.include.runner)-join',')-cne'windows-11-arm,macos-26'){throw 'Exact alternate-pool matrix differs'}
     $blocks=@($yaml.jobs.paired.steps|Where-Object run|ForEach-Object run)
 }else{
-    if([regex]::Matches($workflow,'(?m)^          - runner: (windows-11-arm|macos-15)\r?$').Count-ne2-or$workflow-notmatch'timeout-minutes: 60'-or$workflow-notmatch'fail-fast: false'){throw 'Literal template budget mismatch'}
+    if([regex]::Matches($workflow,'(?m)^          - runner: (windows-11-arm|macos-26)\r?$').Count-ne2-or$workflow-notmatch'timeout-minutes: 60'-or$workflow-notmatch'fail-fast: false'){throw 'Literal template budget mismatch'}
     $blocks=@([regex]::Matches($workflow,'(?m)^        run: \|\r?\n((?:          [^\r\n]*\r?\n)+)')|ForEach-Object{[regex]::Replace($_.Groups[1].Value,'(?m)^          ','')})
 }
 if($blocks.Count-ne4){throw 'Expected four literal workflow PowerShell blocks'}
