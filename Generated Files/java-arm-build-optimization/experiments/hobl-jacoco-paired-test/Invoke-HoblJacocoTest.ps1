@@ -17,6 +17,7 @@ foreach($name in 'Phase','Snapshot'){
 function Save {$result|ConvertTo-Json -Depth 50|Set-Content (Join-Path $OutputDirectory 'result.json') -Encoding utf8}
 function HoblNow {[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()}
 function HoblNativePath([string]$Path){$p=Resolve-Path -LiteralPath $Path;Require ($p.Provider.Name-eq'FileSystem'-and(Test-Path $p.ProviderPath -PathType Leaf)) 'Native filesystem executable required';return $p.ProviderPath}
+function HoblTrialPath([string]$Root=$PSScriptRoot){HoblNativePath (Join-Path $Root 'trial-pom.xml')}
 function HoblIdentity{
     & $script:java -XshowSettings:properties -version *> (Join-Path $OutputDirectory 'java.log');Require ($LASTEXITCODE-eq0) 'Native Java identity failed'
     $result.runtime=NativeRuntime (Get-Content (Join-Path $OutputDirectory 'java.log') -Raw)
@@ -129,7 +130,7 @@ function InvokeHoblWarmRun([ValidateSet('Windows','MacOS')][string]$Platform){
         foreach($n in '.m2/settings.xml','.mavenrc','.mavenrc_pre.cmd','.mavenrc_pre.bat','mavenrc_pre.cmd','mavenrc_pre.bat','mavenrc_post.cmd','mavenrc_post.bat'){Require (-not(Test-Path (Join-Path $HOME $n))) 'Unreviewed Maven rc/settings'}
         $script:java=HoblNativePath (Join-Path $JavaHome $(if($Platform-eq'Windows'){'bin/java.exe'}else{'bin/java'}))
         $script:beforeSource=@{javaSha256=(Get-FileHash $script:java).Hash;jvmConfigSha256=(Get-FileHash (Join-Path $ProjectFullClone '.mvn/jvm.config')).Hash;javaRuntime='25.0.5.0.2+1-LTS';arch='aarch64'}
-        HoblSourceCheck $true;$pom=[IO.File]::ReadAllBytes((Join-Path $ProjectFullClone 'pom.xml'));$cmd=[IO.File]::ReadAllBytes((Join-Path $ProjectFullClone 'mvnw.cmd'));$trial=[IO.File]::ReadAllBytes("$PSScriptRoot\trial-pom.xml");AssertHoblTrialPom $pom $trial
+        HoblSourceCheck $true;$pom=[IO.File]::ReadAllBytes((Join-Path $ProjectFullClone 'pom.xml'));$cmd=[IO.File]::ReadAllBytes((Join-Path $ProjectFullClone 'mvnw.cmd'));$trial=[IO.File]::ReadAllBytes((HoblTrialPath));AssertHoblTrialPom $pom $trial
         $env:JAVA_HOME=$JavaHome;$env:PATH=(Join-Path $JavaHome 'bin')+[IO.Path]::PathSeparator+$env:PATH;Set-Location $ProjectFullClone
         [IO.File]::WriteAllBytes((Join-Path $ProjectFullClone 'pom.xml'),$trial)
         if($Platform-eq'Windows'){HoblCoreIdentity;$candidate=HoblNativePath "$PSScriptRoot\..\hobl-pwsh-pilot\upstream-f62f442-https-license-mvnw.cmd";Require ((Get-FileHash $candidate).Hash-ceq'AAA4957C5AB29267A0D89C03D33621740A4233BF25AFEB480797023687CABB7D') 'AAA required';[IO.File]::WriteAllBytes((Join-Path $ProjectFullClone 'mvnw.cmd'),[IO.File]::ReadAllBytes($candidate));$env:MVNW_PREFER_PWSH='true'}

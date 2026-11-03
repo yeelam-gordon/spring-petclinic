@@ -9,7 +9,15 @@ $runnerText=Get-Content "$PSScriptRoot\Invoke-HoblJacocoTest.ps1" -Raw
 Require ((Get-Command Phase).ScriptBlock.Ast.Extent.Text-ceq$donor.Find({param($n)$n-is[Management.Automation.Language.FunctionDefinitionAst]-and$n.Name-eq'Phase'},$true).Extent.Text) 'Native Phase body changed'
 Require ($phaseText.Contains('/usr/bin/time -p -o $time')-and$phaseText.Contains('Measure-Command')-and$phaseText.Contains('*> $log')) 'Accepted native clock/redirection missing'
 $drive='WarmFixture'+[guid]::NewGuid().ToString('N');[IO.File]::WriteAllText("$fixtureBase\provider-proof.txt",'owned');New-PSDrive $drive FileSystem $fixtureBase -Scope Local|Out-Null
-try{$native=HoblNativePath ($drive+':\provider-proof.txt');Require ($native-ceq(Resolve-Path "$fixtureBase\provider-proof.txt").ProviderPath) 'Native provider path not resolved'}finally{Remove-PSDrive $drive}
+try{
+    $native=HoblNativePath ($drive+':\provider-proof.txt');Require ($native-ceq(Resolve-Path "$fixtureBase\provider-proof.txt").ProviderPath) 'Native provider path not resolved'
+    Copy-Item "$PSScriptRoot\trial-pom.xml" "$fixtureBase\trial-pom.xml"
+    $providerRoot=$drive+':\';$oldReadFailed=$false;try{[IO.File]::ReadAllBytes($providerRoot+'\trial-pom.xml')|Out-Null}catch{$oldReadFailed=$true}
+    Require $oldReadFailed 'Old provider/native boundary did not fail'
+    $trialNative=HoblTrialPath $providerRoot;$bytes=[IO.File]::ReadAllBytes($trialNative)
+    Require ((HashBytes $bytes)-ceq'D7FF6C0FB845850374020A16A65F4B2B1F1BF8E3204C65AB56BDCA2137BDA818') 'Actual native trial read did not preserve D7'
+    @{oldNativeReadRejected=$true;newNativeTrialPath=$trialNative;newTrialSha256=(HashBytes $bytes);actualMacObservation=$false}|ConvertTo-Json|Set-Content "$fixtureBase\trial-native-path-proof.json"
+}finally{Remove-PSDrive $drive}
 $time=ParseTime "real 1.25`nuser 2.00`nsys 0.25`n";Require ($time.real-eq1.25-and$time.user-eq2) 'Mac native time parse'
 $failed=$false;try{ParseTime "real 1`nreal 2`nuser 1`nsys 1`n"}catch{$failed=$true};Require $failed 'Duplicate time accepted'
 function HoblIdentity {$result.runtime=@{'java.home'=$JavaHome;'java.version'='25.0.5.0.2';'java.runtime.version'='25.0.5.0.2+1-LTS';'java.vendor'='Microsoft';'os.arch'='aarch64'};$result.fixtureOnly=$true}

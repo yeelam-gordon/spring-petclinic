@@ -72,8 +72,21 @@ jobs:
         run: |
           $ErrorActionPreference='Stop';$PSNativeCommandUseErrorActionPreference=$false
           $code='./Generated Files/java-arm-build-optimization/experiments/hobl-jacoco-paired-test'
-          if((Get-FileHash "$code/Invoke-HoblJacocoJob.ps1").Hash-cne'70A52052E1857E8FB939D2C705B7FAA17052437ADBF55143EFF887F4CF7086A2'){throw 'Reviewed job integration changed'}
-          if((Get-FileHash "$code/Test-HoblJacocoIntegration.ps1").Hash-cne'70B094261B0BB128080214AC10A9021BEF9196B79980192DA598750352FC9303'){throw 'Reviewed self-contained integration test changed'}
+          $setup=Join-Path $env:GITHUB_WORKSPACE 'hobl-jacoco-owned/setup-evidence'
+          $checks=@()
+          foreach($item in @(@{name='Invoke-HoblJacocoJob.ps1';hash='FBB216FC2AAE186FC80566E7894F79513CEE468F14C3A8D8D506797389C10EC5';bytes=7539;error='Reviewed job integration changed'},@{name='Test-HoblJacocoIntegration.ps1';hash='01F71D8AB20E0FD9102A02D5D99D3535FD98F03A004252A1B147800BE8AED62C';bytes=9430;error='Reviewed self-contained integration test changed'})){
+            $path=(Resolve-Path -LiteralPath (Join-Path $code $item.name)).ProviderPath
+            $data=[IO.File]::ReadAllBytes($path);$actual=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($data))
+            $check=@{name=$item.name;expectedSha256=$item.hash;actualSha256=$actual;expectedBytes=$item.bytes;actualBytes=$data.Length};$checks+=,$check
+            if($actual-cne$item.hash-or$data.Length-ne$item.bytes){
+              [IO.File]::WriteAllBytes((Join-Path $setup "failed-$($item.name).bytes"),$data)
+              $policy=@();foreach($key in 'core.autocrlf','core.eol'){$value=@(& git -C $code config --get $key);$policy+=@{key=$key;values=$value;exitCode=$LASTEXITCODE}}
+              $attrs=@(& git -C $code check-attr text eol -- $item.name)
+              @{status='FAIL';error=$item.error;checks=$checks;effectiveSpecificGitPolicy=$policy;attributes=$attrs}|ConvertTo-Json -Depth 10|Set-Content (Join-Path $setup 'integration-payload-mismatch.json')
+              throw $item.error
+            }
+          }
+          @{status='PASS';checks=$checks}|ConvertTo-Json -Depth 10|Set-Content (Join-Path $setup 'integration-payload-checks.json')
           & "$code/Test-HoblJacocoIntegration.ps1" -FixtureRoot (Join-Path $env:GITHUB_WORKSPACE 'hobl-jacoco-owned/integration-fixtures')
       - name: Ordinary canonical source at exact HOBL pin
         id: source

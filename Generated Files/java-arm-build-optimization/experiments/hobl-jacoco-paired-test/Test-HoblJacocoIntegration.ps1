@@ -1,6 +1,6 @@
 param([Parameter(Mandatory)][string]$FixtureRoot,[switch]$IntentionalFailure)
 $ErrorActionPreference='Stop';$PSNativeCommandUseErrorActionPreference=$false
-. "$PSScriptRoot\Invoke-HoblJacocoJob.ps1" -LibraryOnly
+. "$PSScriptRoot\Invoke-HoblJacocoJob.ps1" -SetupDirectory (Join-Path $FixtureRoot 'setup-evidence') -LibraryOnly
 RequireJob (-not(Test-Path $FixtureRoot)) 'Fresh integration fixtures';New-Item $FixtureRoot -ItemType Directory|Out-Null
 $root=(Resolve-Path $FixtureRoot).ProviderPath;$python=(Get-Process -Id $PID).Path
 $workflow=Get-Content "$PSScriptRoot\paired-test.workflow.yml" -Raw
