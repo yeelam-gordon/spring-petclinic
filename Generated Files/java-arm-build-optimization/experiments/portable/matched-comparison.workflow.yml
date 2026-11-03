@@ -15,6 +15,11 @@ on:
         type: choice
         default: current17
         options: [current17, normalizedHobl25]
+      comparison:
+        required: true
+        type: choice
+        default: MavenVsDaemon
+        options: [MavenVsDaemon, JacocoScope]
 permissions:
   contents: read
 jobs:
@@ -27,6 +32,9 @@ jobs:
       matrix:
         runner: [windows-11-arm, macos-15]
     runs-on: ${{ matrix.runner }}
+    env:
+      COMPARISON: ${{ inputs.comparison }}
+      WORKLOAD: ${{ inputs.workload }}
     defaults:
       run:
         shell: pwsh
@@ -37,6 +45,7 @@ jobs:
           persist-credentials: false
       - name: Initialize separate setup evidence before Java setup
         run: |
+          if($env:COMPARISON-eq'JacocoScope' -and $env:WORKLOAD-ne'current17'){throw 'JacocoScope requires current17'}
           $setup=Join-Path $env:GITHUB_WORKSPACE 'comparison-owned/setup-evidence'
           New-Item $setup -ItemType Directory -Force | Out-Null
           @{status='pending';stage='setup-java';nativeExitCode=$null;error=$null;jdk='not-observed';mvnd='not-observed';compiler='not-observed'} |
@@ -242,7 +251,7 @@ jobs:
             & './Generated Files/java-arm-build-optimization/experiments/portable/Invoke-MatchedComparison.ps1' `
               -ProjectFullClone (Join-Path $owned 'project') -JavaHome $env:JAVA_HOME -MvndHome $env:MVND_HOME `
               -LocalCache (Join-Path $owned 'm2') -OutputDirectory (Join-Path $owned 'evidence') `
-              -Workload $env:WORKLOAD -Samples 3 -LoopbackTests -ExclusiveSlotApproved
+              -Comparison $env:COMPARISON -Workload $env:WORKLOAD -Samples 3 -LoopbackTests -ExclusiveSlotApproved
           }
       - name: Finalize setup diagnostics even when an action failed
         if: always()
@@ -268,7 +277,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: matched-${{ matrix.runner }}-${{ inputs.workload }}
+          name: ${{ inputs.comparison == 'JacocoScope' && 'jacoco-scope' || 'matched' }}-${{ matrix.runner }}-${{ inputs.workload }}
           path: |
             comparison-owned/setup-evidence
             comparison-owned/evidence

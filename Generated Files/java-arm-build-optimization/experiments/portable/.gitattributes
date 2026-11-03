@@ -1,0 +1,10 @@
+Invoke-MatchedComparison.ps1 -text
+Test-MatchedComparison.ps1 -text
+Test-MixedClientPackage.ps1 -text
+Fixture-MixedProcess.ps1 -text
+Invoke-MixedHosted.ps1 -text
+Test-MixedHosted.ps1 -text
+mixed-client-package.workflow.yml -text
+mixed-payload-sha256.json -text
+.gitattributes -text
+matched-comparison.workflow.yml -text
