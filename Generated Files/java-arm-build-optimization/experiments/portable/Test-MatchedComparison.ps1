@@ -47,6 +47,7 @@ Check 'JacocoScope summary uses actual arm medians and rejects mixed modes/full 
 Check 'JacocoScope real orchestration calls two untimed verifies and six alternating test-only cases' {
     $module=New-Module -ArgumentList ${function:PrepareJacocoScope}.ToString(),${function:MeasureJacocoScope}.ToString() -ScriptBlock {
         param($prepare,$measure)
+        Export-ModuleMember -Function @() -Alias @() -Variable @()
         $script:Samples=3;$script:plan=@{pairs=@(@('default','candidate'),@('candidate','default'),@('default','candidate'))};$script:calls=@()
         function RunJacocoScopeCase($name,$arm,$goals,$timed){$script:calls+=@{name=$name;arm=$arm;goals=$goals;timed=$timed}}
         . ([scriptblock]::Create("function PrepareJacocoScope { $prepare }; function MeasureJacocoScope { $measure }"))
@@ -72,6 +73,7 @@ Check 'JI-001 actual production mode branches preserve both default preps and di
         [IO.File]::WriteAllBytes((Join-Path $project 'pom.xml'),$original)
         $module=New-Module -ArgumentList $prep,$timing,$mode,$project,$output,${function:JacocoTrialPomBytes}.ToString(),${function:AssertJacocoSource}.ToString(),${function:PrepareJacocoScope}.ToString(),${function:MeasureJacocoScope}.ToString() -ScriptBlock {
             param($prep,$timing,$mode,$project,$output,$transform,$assert,$prepare,$measure)
+            Export-ModuleMember -Function @() -Alias @() -Variable @()
             $script:Comparison=$mode;$script:ProjectFullClone=$project;$script:OutputDirectory=$output;$script:Samples=3;$script:events=@()
             $script:plan=@{sourcePin='500158f732419217507c7656904b8e6aa1bcc0d6';pairs=$(if($mode-eq'JacocoScope'){@(@('default','candidate'),@('candidate','default'),@('default','candidate'))}else{@(@('stock','daemon'),@('daemon','stock'),@('stock','daemon'))})}
             $script:result=@{selectedRuntime='fixture';package=@{stock=@();daemon=@()};test=@{stock=@();daemon=@()}}
@@ -121,6 +123,7 @@ Check 'JacocoScope actual case executes native fixture then untimed audits and p
     foreach($path in @($output,(Join-Path $project 'target/site/jacoco'),(Join-Path $project 'target/surefire-reports'))){New-Item $path -ItemType Directory -Force|Out-Null}
     $module=New-Module -ArgumentList ${function:RunJacocoScopeCase}.ToString(),${function:JacocoScopeArguments}.ToString(),$project,$output -ScriptBlock {
         param($body,$scope,$project,$output)
+        Export-ModuleMember -Function @() -Alias @() -Variable @()
         $script:ProjectFullClone=$project;$script:OutputDirectory=$output;$script:events=@();$script:failProof=$false
         $script:result=@{test=@{default=@();candidate=@()};snapshots=@(@{reportSemantics=@('baseline')});selectedRuntime=@{arch='aarch64'};jacoco=@{freshness=@()}}
         function Require($condition,$message){if(-not$condition){throw $message}}
@@ -158,6 +161,7 @@ Check 'JacocoScope restore finally preserves original bytes and surfaces cleanup
     $trial=JacocoTrialPomBytes $original;[IO.File]::WriteAllBytes((Join-Path $project 'pom.xml'),$trial)
     $module=New-Module -ArgumentList ${function:RestoreComparisonPom}.ToString(),${function:RestoreJacocoPom}.ToString(),${function:AssertJacocoSource}.ToString(),$project,$original -ScriptBlock {
         param($restore,$bytes,$assert,$project,$original)
+        Export-ModuleMember -Function @() -Alias @() -Variable @()
         $script:ProjectFullClone=$project;$script:originalPomBytes=$original;$script:trialPomHash='trial';$script:result=@{status='FAIL';cleanupFailure='fixture-cleanup-failure'}
         function Require($condition,$message){if(-not$condition){throw $message}}
         function SourceGate {if([Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $script:ProjectFullClone 'pom.xml')))-cne[Convert]::ToBase64String($script:originalPomBytes)){throw 'Not restored'}}
@@ -346,6 +350,7 @@ Check 'Exact-owned test cleanup retains source/classes and exposes linked-path/d
     'old'|Set-Content (Join-Path $project 'target/jacoco.exec')
     $module=New-Module -ArgumentList ${function:ClearJacocoTestOutput}.ToString() -ScriptBlock {
         param($body)
+        Export-ModuleMember -Function @() -Alias @() -Variable @()
         function Require($condition,$message){if(-not$condition){throw $message}}
         function Remove-Item {throw 'fixture-delete-error'}
         . ([scriptblock]::Create("function ClearJacocoTestOutput { $body }"))
@@ -354,6 +359,7 @@ Check 'Exact-owned test cleanup retains source/classes and exposes linked-path/d
     Rejects {& $module {param($p) ClearJacocoTestOutput $p} $project} 'fixture-delete-error'
     $linked=New-Module -ArgumentList ${function:ClearJacocoTestOutput}.ToString(),$project -ScriptBlock {
         param($body,$owned)
+        Export-ModuleMember -Function @() -Alias @() -Variable @()
         $script:owned=$owned
         function Require($condition,$message){if(-not$condition){throw $message}}
         function Get-Item {param($LiteralPath,[switch]$Force,$ErrorAction)
@@ -601,6 +607,7 @@ Check 'Actual pinned JDK downloader covers four native builds and rejects wrong 
             $env:GITHUB_WORKSPACE=$case;$env:GITHUB_OUTPUT=Join-Path $case 'outputs';$env:WORKLOAD=$mode
             $module=New-Module -ArgumentList $definitions -ScriptBlock {
                 param($text)
+                Export-ModuleMember -Function @() -Alias @() -Variable @()
                 . ([scriptblock]::Create($text))
                 function Invoke-WebRequest($Uri,$OutFile){'mock archive only'|Set-Content $OutFile}
                 function Get-FileHash($Path,$Algorithm){@{Hash=$script:expectedHash}}
@@ -677,6 +684,7 @@ Check 'Actual workflow setup retains failed diagnostics and success leaves runne
             $env:ComSpec=Join-Path $caseRoot 'mock-cmd.exe';[Environment]::SetEnvironmentVariable('ProgramFiles(x86)',$caseRoot)
             $module=New-Module -ArgumentList $functions,$caseRoot,$scenario -ScriptBlock {
                 param($definitions,$fixtureRoot,$fixtureCase)
+                Export-ModuleMember -Function @() -Alias @() -Variable @()
                 . ([scriptblock]::Create($definitions))
                 function Invoke-WebRequest($Uri,$OutFile){'mock download'|Set-Content $OutFile}
                 function Get-FileHash($Path,$Algorithm){

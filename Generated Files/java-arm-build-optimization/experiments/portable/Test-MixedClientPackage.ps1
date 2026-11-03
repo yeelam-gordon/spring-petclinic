@@ -18,6 +18,7 @@ foreach($os in 'Windows','MacOS'){
  foreach($case in 'positive','injected-option','admission-fail','process-fail','source-fail','wrong-context','empty-context','stale-context','stop-fail','ownership-reject'){
   $module=New-Module -ArgumentList $source,$definitions,$e,$os,$case,$fixtureNames,([bool]$TestUnexpectedFailure) -ScriptBlock {
    param($source,$definitions,$e,$os,$case,$fixtureNames,$TestUnexpectedFailure)
+   Export-ModuleMember -Function @() -Alias @() -Variable @()
    . $source -LibraryOnly
    foreach($definition in $definitions){. ([scriptblock]::Create($definition))}
    $Comparison='MixedClientPackage';$Workload='current17';$Samples=3;$LoopbackTests=$true

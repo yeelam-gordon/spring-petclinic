@@ -32,6 +32,7 @@ foreach($os in 'Windows','MacOS'){
  foreach($case in 'positive','bad-hash','source-fail','child-fail','jdk-positive','jdk-bad-hash'){
   $module=New-Module -ArgumentList $root,$FixtureRoot,$os,$case -ScriptBlock {
    param($root,$FixtureRoot,$os,$case)
+   Export-ModuleMember -Function @() -Alias @() -Variable @()
    . (Join-Path $root 'Invoke-MixedHosted.ps1') -LibraryOnly
    $owned=Join-Path $FixtureRoot ("$os-$case-"+[guid]::NewGuid().ToString('N'));$jdk=Join-Path $owned 'native jdk'
    New-Item $jdk -ItemType Directory -Force|Out-Null
