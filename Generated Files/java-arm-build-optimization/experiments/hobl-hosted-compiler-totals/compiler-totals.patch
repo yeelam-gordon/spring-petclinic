@@ -1,0 +1,206 @@
+diff --git a/Invoke-HoblContract.ps1 b/Invoke-HoblContract.ps1
+index 545a48d..4fdeb0d 100644
+--- a/Invoke-HoblContract.ps1
++++ b/Invoke-HoblContract.ps1
+@@ -2,7 +2,9 @@
+ param(
+     [string]$ProjectFullClone,[string]$JavaHome,[string]$LocalCache,[string]$OutputDirectory,
+     [switch]$ExclusiveSlotApproved,[switch]$AcknowledgeContractReconstruction,
+-    [switch]$LoopbackTests,[switch]$LibraryOnly
++    [switch]$LoopbackTests,[switch]$LibraryOnly,[switch]$WindowsPreferPwsh,
++    [ValidateSet('Prototype334','UpstreamF62f442HttpsLicense')][string]$WindowsCandidateRevision='Prototype334',
++    [ValidateSet('HostedElapsed')][string]$DiagnosticMode='HostedElapsed'
+ )
+ $ErrorActionPreference='Stop'
+ $PSNativeCommandUseErrorActionPreference=$false
+@@ -26,7 +28,7 @@ function ContractArguments([string]$Phase,[string]$Cache,[bool]$Loopback=$true){
+         'go-offline'{return @($repo)+$bind+@('-DskipTests','dependency:go-offline')}
+         'verify'{return @($repo)+$bind+@('clean','verify')}
+         'clean'{return @($repo)+$bind+@('clean')}
+-        'package'{return @('-o',$repo)+$bind+@('-DskipTests','package')}
++        'package'{return @('-o',$repo)+$bind+@('-DskipTests','-Dmaven.compiler.verbose=true','package')}
+         'test'{return @('-o',$repo)+$bind+@('test')}
+         'report'{return @('-o',$repo)+$bind+@('jacoco:report')}
+         default{throw 'Unknown contract phase'}
+@@ -95,7 +97,62 @@ function ResolveGitApplication([object[]]$Applications,[scriptblock]$IsFile={par
+     Require (& $IsFile $selected) 'First PATH Git application is not an existing file'
+     return @{selectedPath=$selected;candidatePaths=$paths;selection='First Application in ordered PATH discovery; no alias/function or speed selection'}
+ }
++function HoblPreferenceSpec([ValidateSet('Prototype334','UpstreamF62f442HttpsLicense')][string]$Revision='Prototype334'){
++    if($Revision-eq'Prototype334'){return @{revision=$Revision;file='candidate-mvnw.cmd';sha256='655A91268C8DE0B8B233492F49014F9F3975BCABE7B0B8B2DC5C22A8E26EAEBA'}}
++    return @{revision=$Revision;file='upstream-f62f442-https-license-mvnw.cmd';sha256='AAA4957C5AB29267A0D89C03D33621740A4233BF25AFEB480797023687CABB7D';sourceCommit='f62f4422387ff1e4aa90b03de698893f83ba79ae';sourceCompanionPatchSha256='6E64CEDC6744E9378902F41DC3648CED282855804BB4F319E40C20518D14CE79';httpsTemplateSha256='A4E4F5C312016CF58C8DC58AB8337DEE2736E74AEF6587E662635E7AA4D5E82C';portPatchSha256='4438759FE3D0ECD2670A226F495AB410AA1BDD639FC7B8ECB5F2C160AA5B7366';parentRenderSha256='84D9DA5A6FE003DCACAA0D269FBA1BB4780D1BC49F97D36B6CC71D852CAD4FE9';httpsRenderPatchSha256='876F9583F9103DB0C4EB58BB77DCE55511D679DD773B44BBB75D048D646C71B0';scope='Separately named HTTPS-license policy variant, not exact original HTTP port'}
++}
++function InitializeMatchedWindowsEnvironmentHelpers{
++    $tokens=$null;$errors=$null
++    $path=Join-Path $PSScriptRoot '..\hobl-wrapper-diagnostic\Invoke-WrapperBoundary.ps1'
++    $ast=[Management.Automation.Language.Parser]::ParseFile($path,[ref]$tokens,[ref]$errors)
++    Require ($errors.Count-eq0) 'Reviewed environment helper parse failed'
++    foreach($name in 'GetBoundaryEnvironmentSnapshot','RestoreBoundaryEnvironment'){
++        $definition=$ast.Find({param($node)$node-is[Management.Automation.Language.FunctionDefinitionAst]-and$node.Name-eq$name},$true)
++        Require $definition 'Reviewed environment helper export missing'
++        . ([scriptblock]::Create($definition.Extent.Text.Replace("function $name","function script:$name")))
++    }
++}
++function GetMatchedEnvironmentSnapshot{
++    if($IsWindows){InitializeMatchedWindowsEnvironmentHelpers;return (GetBoundaryEnvironmentSnapshot)}
++    $snapshot=[Collections.Hashtable]::new([StringComparer]::Ordinal)
++    $values=[Environment]::GetEnvironmentVariables('Process')
++    foreach($key in $values.Keys){$snapshot.Add([string]$key,$values[$key])};return $snapshot
++}
++function RestoreMatchedEnvironment($Before,[string[]]$Names){
++    if($IsWindows){return (RestoreBoundaryEnvironment $Before $Names)}
++    $errors=@()
++    foreach($name in $Names){
++        try{if($Before.Contains($name)){[Environment]::SetEnvironmentVariable($name,$Before[$name],'Process')}elseif(Test-Path ('Env:'+$name)){Remove-Item ('Env:'+$name) -ErrorAction Stop}}
++        catch{$errors+=@{name=$name;error=$_.ToString()}}
++    }
++    $after=GetMatchedEnvironmentSnapshot
++    $keys=@(foreach($name in $Names){
++        $a=$Before.Contains($name);$b=$after.Contains($name)
++        @{name=$name;beforePresent=$a;afterPresent=$b;equal=($a-eq$b-and[string]::Equals($Before[$name],$after[$name],[StringComparison]::Ordinal));beforeLength=$(if($a){$Before[$name].Length}else{$null});afterLength=$(if($b){$after[$name].Length}else{$null});beforeSha=$(if($a){HashBytes ([Text.Encoding]::UTF8.GetBytes($Before[$name]))}else{$null});afterSha=$(if($b){HashBytes ([Text.Encoding]::UTF8.GetBytes($after[$name]))}else{$null})}
++    })
++    return @{restored=($errors.Count-eq0-and@($keys|Where-Object {-not$_.equal}).Count-eq0);keys=$keys;errors=$errors;comparer='Ordinal Unix environment names'}
++}
++function AssertHoblNoHttpPath([string]$Project,[bool]$Windows){
++    [xml]$rules=Get-Content (Join-Path $Project 'src/checkstyle/nohttp-checkstyle-suppressions.xml') -Raw
++    $path=[IO.Path]::GetFullPath((Join-Path $Project $(if($Windows){'mvnw.cmd'}else{'mvnw'})))
++    foreach($rule in $rules.SelectNodes('/suppressions/suppress')){
++        $files=$rule.GetAttribute('files');$checks=$rule.GetAttribute('checks')
++        Require ($files-and$checks) 'Unsupported NoHTTP suppression shape'
++        Require (-not([regex]::IsMatch('io.spring.nohttp.checkstyle.check.NoHttpCheck',$checks)-and[regex]::IsMatch($path,$files))) 'Source ancestry would suppress unchanged NoHTTP gate'
++    }
++}
++function AssertHoblSourceMode([bool]$Preferred,[bool]$Windows,[string]$Changes,[string]$WrapperHash,[string]$PomHash,[string]$Revision='Prototype334'){
++    if(-not$Preferred){Require ([string]::IsNullOrEmpty($Changes)) 'Source dirty';return}
++    Require $Windows 'Preferred pwsh mode is Windows-only'
++    Require ($Changes-ceq' M mvnw.cmd'-and$WrapperHash-eq(HoblPreferenceSpec $Revision).sha256-and$PomHash-eq'A41D9CC2B0287AA03BCE5205171B111FD1620A4DD6DCF48D9624A189B50F1E0D') 'Unapproved preferred source state'
++}
++function EnableHoblElapsedDiagnostic([ValidateSet('HostedElapsed')][string]$Mode){
++    Require (-not[Environment]::GetEnvironmentVariable('MAVEN_OPTS')) 'Diagnostic requires guarded empty original MAVEN_OPTS'
++    $env:MAVEN_OPTS='-Dorg.slf4j.simpleLogger.showDateTime=true'
++}
++$script:preferActive=$false;$script:preferRevision=$WindowsCandidateRevision
+ if($LibraryOnly){return}
++Require (-not$WindowsPreferPwsh-or$IsWindows) 'Preferred pwsh mode is Windows-only'
+ Require ($ExclusiveSlotApproved -and $AcknowledgeContractReconstruction -and $LoopbackTests) 'Explicit runtime approval, reconstruction acknowledgement and loopback safety required'
+ foreach($path in @($ProjectFullClone,$JavaHome,$LocalCache,$OutputDirectory)){Require (-not[string]::IsNullOrWhiteSpace($path)) 'Explicit clone/JDK/cache/fresh output required'}
+ $ProjectFullClone=[IO.Path]::GetFullPath($ProjectFullClone);$OutputDirectory=[IO.Path]::GetFullPath($OutputDirectory);$LocalCache=[IO.Path]::GetFullPath($LocalCache)
+@@ -109,7 +166,7 @@ foreach($path in @($ProjectFullClone,$OutputDirectory,$LocalCache,$JavaHome)){
+ foreach($path in @($OutputDirectory,$LocalCache)){Require (-not$path.Equals($ProjectFullClone,[StringComparison]::OrdinalIgnoreCase) -and -not$path.StartsWith($ProjectFullClone+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) 'Cache/evidence must be outside source'}
+ Require (-not(Test-Path $OutputDirectory)) 'Fresh output required'
+ Require (Test-Path (Join-Path $ProjectFullClone '.git') -PathType Container) 'Ordinary full clone required; worktrees rejected'
+-foreach($name in 'MAVEN_OPTS','MAVEN_ARGS','JAVA_TOOL_OPTIONS','JDK_JAVA_OPTIONS','_JAVA_OPTIONS','JAVACMD','MAVEN_USER_HOME','MVNW_REPOURL','MVNW_USERNAME','MVNW_PASSWORD','GIT_DIR','GIT_WORK_TREE','GIT_COMMON_DIR'){
++foreach($name in 'MAVEN_OPTS','MAVEN_ARGS','JAVA_TOOL_OPTIONS','JDK_JAVA_OPTIONS','_JAVA_OPTIONS','JAVACMD','MAVEN_USER_HOME','MVNW_REPOURL','MVNW_USERNAME','MVNW_PASSWORD','GIT_DIR','GIT_WORK_TREE','GIT_COMMON_DIR','MVNW_PREFER_PWSH'){
+     Require (-not[Environment]::GetEnvironmentVariable($name)) "Review nonempty injected option $name first"
+ }
+ foreach($name in '.m2/settings.xml','.mavenrc','.mavenrc_pre.cmd','.mavenrc_pre.bat'){
+@@ -117,17 +174,27 @@ foreach($name in '.m2/settings.xml','.mavenrc','.mavenrc_pre.cmd','.mavenrc_pre.
+ }
+ New-Item $OutputDirectory -ItemType Directory|Out-Null
+ $result=[ordered]@{
+-    status='running';lane='MATCHED HOBL-CONTRACT REPRODUCTION';pin='6feeae0f13e0e258eedc99832416b42bb13779b1'
++    status='running';lane='MATCHED HOBL-CONTRACT REPRODUCTION';pin='6feeae0f13e0e258eedc99832416b42bb13779b1';windowsPreferPwsh=[bool]$WindowsPreferPwsh;cohortWindowsCandidateRevision=$WindowsCandidateRevision
+     hoblSource='df120528374c0a5de5cb5a526175973d1ea2b53f';project=$ProjectFullClone;cache=$LocalCache;phases=@();samples=@();snapshots=@()
+     deviations=@('JDK25.0.5.0.2+1-LTS instead of original requested25.0.0.36; actual original DUT unknown','Pinned full clone repairs Windows checkout/Mac HEAD ambiguity','Explicit common loopback property','PowerShell7 outer harness, including Mac process launch/redirection; native /usr/bin/time -p boundary retained','Windows timer also includes immediate native-exit assignment; retain raw samples rather than only rounded CSV','Per-case logs/artifact retention; no outer HOBL tracing/system prep','Additional untimed offline JaCoCo report after each test for audit','No official DUT score or online/offline artifact-equivalence claim')
+ }
+-function Save {$result|ConvertTo-Json -Depth 45|Set-Content (Join-Path $OutputDirectory 'result.json') -Encoding utf8}
++function Save {
++    foreach($record in @($result)+@($result.samples)+@($result.snapshots)+@($result.phases)+@($result.summary|Where-Object {$_})){
++        $record['diagnosticMode']='HostedCompilerTotals';$record['instrumented']=$true
++        if($record.Contains('arguments')){$record['compilerVerboseApplied']=($record.arguments-contains'-Dmaven.compiler.verbose=true')}
++        $record['performanceEligible']=$false;$record['eligibility']='DiagnosticNotPerformance'
++    }
++    $result.lane='INSTRUMENTED HOSTED CompilerTotals DIAGNOSTIC NOT PERFORMANCE'
++    $result|ConvertTo-Json -Depth 45|Set-Content (Join-Path $OutputDirectory 'result.json') -Encoding utf8
++}
+ function GitText([string[]]$Arguments){
+     $text=@(& $script:gitExecutable @Arguments);$code=$LASTEXITCODE;Require ($code-eq0) "Git failed $code";return ($text-join"`n")
+ }
+ function SourceGate{
+     Require ((GitText @('-C',$ProjectFullClone,'rev-parse','HEAD'))-eq$result.pin) 'Wrong source pin'
+-    Require (-not(GitText @('-C',$ProjectFullClone,'status','--porcelain=v1','--untracked-files=all'))) 'Source dirty'
++    $changes=GitText @('-C',$ProjectFullClone,'status','--porcelain=v1','--untracked-files=all')
++    if($script:preferActive){Require ($env:MVNW_PREFER_PWSH-ceq'true') 'Preferred selector changed';AssertHoblSourceMode $true $IsWindows $changes (Get-FileHash "$ProjectFullClone\mvnw.cmd").Hash (Get-FileHash "$ProjectFullClone\pom.xml").Hash $script:preferRevision}
++    else{Require (-not$changes) 'Source dirty'}
+ }
+ function Phase([string]$Name,[string[]]$Arguments,[bool]$Timed=$false){
+     $log=Join-Path $OutputDirectory "$Name.log";$script:code=$null
+@@ -166,7 +233,8 @@ function Snapshot([string]$Name,[bool]$Online){
+             $raw+=@{entry=$metadataEntryName;path=$path;bytes=$bytes.Length;sha256=(HashBytes $bytes)}
+             if($metadataEntryName-eq'BOOT-INF/classes/git.properties'){
+                 $text=[Text.Encoding]::UTF8.GetString($bytes)
+-                Require ($text-match'(?m)^git\.commit\.id=6feeae0f13e0e258eedc99832416b42bb13779b1\r?$' -and $text-match'(?m)^git\.dirty=false\r?$') 'Wrong packaged Git provenance'
++                $expectedDirty=if($script:preferActive){'true'}else{'false'}
++                Require ($text-match'(?m)^git\.commit\.id=6feeae0f13e0e258eedc99832416b42bb13779b1\r?$' -and $text-match"(?m)^git\.dirty=$expectedDirty\r?$") 'Wrong packaged Git provenance'
+             }
+             if($metadataEntryName-eq'META-INF/sbom/application.cdx.json'){$sbom=[Text.Encoding]::UTF8.GetString($bytes)|ConvertFrom-Json;Require ($sbom.components.Count-gt0 -and $sbom.dependencies.Count-gt0) 'Empty online SBOM/graph'}
+         }
+@@ -202,12 +270,15 @@ function Snapshot([string]$Name,[bool]$Online){
+     }
+     $result.snapshots+=,$snapshot;Save
+ }
+-$saved=@{};foreach($name in 'JAVA_HOME','PATH'){$saved[$name]=[Environment]::GetEnvironmentVariable($name)}
+-$pushed=$false
++$managedEnvironmentNames=@('JAVA_HOME','PATH','MAVEN_OPTS','MAVEN_ARGS','JAVA_TOOL_OPTIONS','JDK_JAVA_OPTIONS','_JAVA_OPTIONS','MAVEN_SKIP_RC','JAVACMD','MAVEN_USER_HOME','MVNW_PREFER_PWSH')
++$saved=GetMatchedEnvironmentSnapshot;$savedLocation=(Get-Location).Path
++$pushed=$false;$preferOriginalBytes=$null
+ try{
++    EnableHoblElapsedDiagnostic $DiagnosticMode
+     $result.gitApplication=ResolveGitApplication @(Get-Command git -All -CommandType Application -ErrorAction SilentlyContinue)
+     $script:gitExecutable=$result.gitApplication.selectedPath
+     $result.gitApplication.sha256=(Get-FileHash -LiteralPath $script:gitExecutable -Algorithm SHA256).Hash
++    AssertHoblNoHttpPath $ProjectFullClone $IsWindows
+     Save
+     SourceGate
+     Require ((GitText @('-C',$ProjectFullClone,'rev-parse','--git-common-dir'))-eq'.git') 'Shared common Git directory rejected'
+@@ -218,6 +289,7 @@ try{
+         @{path=$name;sha256=(Get-FileHash (Join-Path $ProjectFullClone $name)).Hash}
+     })
+     $result.environment=@{logicalProcessors=[Environment]::ProcessorCount;processArchitecture=[Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString();osArchitecture=[Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString();imageOS=$env:ImageOS;imageVersion=$env:ImageVersion;injectedOptions='Required empty, never silently normalized by local runner';gitVariables=@(Get-ChildItem Env:|Where-Object Name -like 'GIT*'|ForEach-Object {@{name=$_.Name;value='[REDACTED]';sha256=(HashBytes ([Text.Encoding]::UTF8.GetBytes($_.Value)))}})}
++    $result.environment.hostRun=@{runnerName=$env:RUNNER_NAME;runnerOS=$env:RUNNER_OS;runnerArch=$env:RUNNER_ARCH;runId=$env:GITHUB_RUN_ID;runAttempt=$env:GITHUB_RUN_ATTEMPT}
+     if($IsWindows){$competing=@(Get-CimInstance Win32_Process|Where-Object {$_.Name-in@('java.exe','javaw.exe','cl.exe','link.exe','msbuild.exe')}|Select-Object ProcessId,Name)}
+     else{$all=@(& /bin/ps -axo 'pid=,command=');Require ($LASTEXITCODE-eq0) 'Process preflight failed';$competing=@($all|Where-Object {$_-match'[/ ]java(?:\s|$)'})}
+     $result.environment.competingWorkloads=$competing;Require ($competing.Count-eq0) 'Competing Java/native build workload; none will be stopped'
+@@ -226,6 +298,21 @@ try{
+     Push-Location $ProjectFullClone;$pushed=$true
+     $script:wrapper=Join-Path $ProjectFullClone $(if($IsWindows){'mvnw.cmd'}else{'mvnw'})
+     Require ($IsWindows -or $IsMacOS) 'Only Windows/macOS qualified contract supported'
++    if($WindowsPreferPwsh){
++        Require ((Get-FileHash $script:wrapper).Hash-eq'5DDDBC06B22E26410B82AA17181510058D58319DED13E1822D6D784196582F1A'-and$result.source.pomSha256-eq'A41D9CC2B0287AA03BCE5205171B111FD1620A4DD6DCF48D9624A189B50F1E0D') 'Pristine original inputs differ'
++        $spec=HoblPreferenceSpec $WindowsCandidateRevision
++        $candidate=Join-Path $PSScriptRoot ("..\hobl-pwsh-pilot\"+$spec.file)
++        Require ((Get-FileHash $candidate).Hash-eq$spec.sha256-and-not(Test-Path "$ProjectFullClone\pwsh.exe")) 'Candidate/shadowing guard'
++        $paths=@(& "$env:SystemRoot\System32\where.exe" pwsh.exe);$native=$LASTEXITCODE;Require ($native-eq0-and$paths.Count-gt0) 'Preferred Core unavailable; no fallback accepted as gain'
++        $self=@(& $paths[0] -NoProfile -Command '[pscustomobject]@{edition=$PSVersionTable.PSEdition;version=$PSVersionTable.PSVersion.ToString();exe=[Diagnostics.Process]::GetCurrentProcess().MainModule.FileName}|ConvertTo-Json -Compress');$native=$LASTEXITCODE
++        Require ($native-eq0) 'Core self identity failed';$core=($self-join"`n")|ConvertFrom-Json
++        Require ($core.edition-eq'Core'-and[version]$core.version-ge[version]'7.0'-and[IO.Path]::GetFullPath($core.exe)-eq[IO.Path]::GetFullPath($paths[0])) 'Actual Core identity differs'
++        $pe=[IO.File]::ReadAllBytes($paths[0]);Require ([BitConverter]::ToUInt16($pe,([BitConverter]::ToInt32($pe,60)+4))-eq0xAA64) 'Preferred Core must be native ARM64'
++        $preferOriginalBytes=[IO.File]::ReadAllBytes($script:wrapper);[IO.File]::WriteAllBytes($script:wrapper,[IO.File]::ReadAllBytes($candidate))
++        $script:preferActive=$true;$env:MVNW_PREFER_PWSH='true';$result.preference=@{identity=$core;available=$true;selectedPath=$paths[0];candidateSha256=(Get-FileHash $candidate).Hash;candidateProvenance=$spec;selector='MVNW_PREFER_PWSH=true'};SourceGate;Save
++    }else{
++        $result.preference=@{applied=$false;wrapper='unchanged original platform wrapper';cohortWindowsCandidateRevision=$WindowsCandidateRevision}
++    }
+     $java=Join-Path $JavaHome $(if($IsWindows){'bin/java.exe'}else{'bin/java'})
+     & $java -XshowSettings:properties -version *> (Join-Path $OutputDirectory 'java.log');Require ($LASTEXITCODE-eq0) 'Java identity command failed'
+     $result.runtime=NativeRuntime (Get-Content (Join-Path $OutputDirectory 'java.log') -Raw)
+@@ -250,9 +337,17 @@ try{
+     $result.status='PASS'
+ }catch{$result.status='FAIL';$result.failure=$_.ToString()}
+ finally{
+-    if($pushed){Pop-Location}
+-    foreach($name in $saved.Keys){if($null-eq$saved[$name]){Remove-Item "Env:$name" -ErrorAction SilentlyContinue}else{[Environment]::SetEnvironmentVariable($name,$saved[$name])}}
+-    try{SourceGate;$result.sourceCleanAfter=$true}catch{$result.status='FAIL';$result.restorationFailure=$_.ToString()}
++    $restoreErrors=@()
++    try{if($preferOriginalBytes){$hash=(Get-FileHash $script:wrapper).Hash;Require ($hash-in@((HoblPreferenceSpec $script:preferRevision).sha256,'5DDDBC06B22E26410B82AA17181510058D58319DED13E1822D6D784196582F1A')) 'Unexpected wrapper changes; refuse overwrite';[IO.File]::WriteAllBytes($script:wrapper,$preferOriginalBytes);Require ((Get-FileHash $script:wrapper).Hash-eq'5DDDBC06B22E26410B82AA17181510058D58319DED13E1822D6D784196582F1A') 'Wrapper restore mismatch';$script:preferActive=$false}}catch{$restoreErrors+=$_.ToString()}
++    try{if($pushed){Pop-Location}}catch{$restoreErrors+=$_.ToString()}
++    try{
++        $result.environmentRestoration=RestoreMatchedEnvironment $saved $managedEnvironmentNames
++        $result.environmentRestoration.cwdEqual=((Get-Location).Path-eq$savedLocation)
++        $result.environmentRestoration|ConvertTo-Json -Depth 10|Set-Content (Join-Path $OutputDirectory 'environment-restoration.json')
++        Require ($result.environmentRestoration.restored-and$result.environmentRestoration.cwdEqual-and$result.environmentRestoration.keys.Count-eq11) 'Inner eleven-key environment/cwd restoration failed'
++    }catch{$restoreErrors+=$_.ToString()}
++    try{Require (-not$script:preferActive) 'Wrapper not restored';SourceGate;$result.sourceCleanAfter=$true}catch{$restoreErrors+=$_.ToString()}
++    if($restoreErrors.Count){$result.status='FAIL';$result.restorationFailure=$restoreErrors-join'; '}
+     try{
+         if($IsWindows){
+             $remaining=@(Get-CimInstance Win32_Process|Where-Object {$_.Name-eq'java.exe' -and $_.CommandLine -and ($_.CommandLine.Contains($ProjectFullClone) -or $_.CommandLine.Contains($OutputDirectory))}|Select-Object ProcessId,ExecutablePath,CommandLine)
