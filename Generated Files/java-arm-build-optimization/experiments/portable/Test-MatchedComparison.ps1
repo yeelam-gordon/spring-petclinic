@@ -65,7 +65,7 @@ Check 'JI-001 actual production mode branches preserve both default preps and di
     $timing=@($main.Body.Statements|Where-Object {$_-is[Management.Automation.Language.IfStatementAst] -and $_.Extent.Text.Contains('MeasureJacocoScope')})[0].Extent.Text
     $root=if($SetupTestRoot){$SetupTestRoot}else{Join-Path $env:GITHUB_WORKSPACE 'comparison-owned/setup-evidence/mock-tests'}
     $original=[IO.File]::ReadAllBytes((Join-Path $PSScriptRoot '..\..\..\..\pom.xml'))
-    $savedOpts=[Environment]::GetEnvironmentVariable('MAVEN_OPTS','Process')
+    $savedOpts=PortableEnvironmentSnapshot
     try{foreach($mode in 'MavenVsDaemon','JacocoScope'){
         $fixture=Join-Path $root ('production-branches-'+[guid]::NewGuid().ToString('N'))
         $project=Join-Path $fixture 'project';$output=Join-Path $fixture 'evidence'
@@ -114,7 +114,7 @@ Check 'JI-001 actual production mode branches preserve both default preps and di
                 Require ([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([IO.File]::ReadAllBytes((Join-Path $project 'pom.xml'))))-eq'A14A495B06D207043B9AE6B9CDE8B129357991AFD9DF0A68C94D93081E280B2F') 'Actual branch did not install common POM'
             }
         }finally{[IO.File]::WriteAllBytes((Join-Path $project 'pom.xml'),$original)}
-    }}finally{[Environment]::SetEnvironmentVariable('MAVEN_OPTS',$savedOpts,'Process')}
+    }}finally{$optsRestore=RestorePortableEnvironment $savedOpts @('MAVEN_OPTS');Require $optsRestore.restored 'Production-branch fixture MAVEN_OPTS restoration failed'}
 }
 Check 'JacocoScope actual case executes native fixture then untimed audits and propagates fidelity failure' {
     $root=if($SetupTestRoot){$SetupTestRoot}else{Join-Path $env:GITHUB_WORKSPACE 'comparison-owned/setup-evidence/mock-tests'}
