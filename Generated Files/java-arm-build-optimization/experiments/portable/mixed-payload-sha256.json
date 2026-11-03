@@ -21,7 +21,7 @@
   },
   {
     "file": "Test-MixedHosted.ps1",
-    "sha256": "AFA1F0D261C70610520FF3487F6AA2F80DD6CF7CBD51B63B3BECF84EB67F16F8"
+    "sha256": "7C3997CBFDA28BB40441802D09CB3446DBCA5330A608AE2E5E363FD3989F8CBC"
   },
   {
     "file": "mixed-client-package.workflow.yml",

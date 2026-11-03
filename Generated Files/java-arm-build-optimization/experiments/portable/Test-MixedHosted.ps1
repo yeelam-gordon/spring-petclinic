@@ -92,7 +92,8 @@ foreach($os in 'Windows','MacOS'){
     Require ($plan.comparison-eq'MixedClientPackage'-and$plan.sourcePin-eq'500158f732419217507c7656904b8e6aa1bcc0d6'-and$plan.samples-eq3-and$plan.loopbackTests) 'Actual collector entrypoint forwarding failed'
     if($os-eq'Windows'){Require ($plan.candidate.EndsWith('mvnd.cmd')) 'Windows JVM route differs'}
     else{
-     @{candidate=$plan.candidate;comSpecPresent=[Environment]::GetEnvironmentVariables().Contains('ComSpec');comSpecEmpty=[string]::IsNullOrEmpty($env:ComSpec);events=$events}|ConvertTo-Json -Depth 10|Set-Content (Join-Path $owned 'setup-evidence/native-route-observation.json')
+     $routeEnvironment=PortableEnvironmentSnapshot
+     @{candidate=$plan.candidate;comSpecPresent=$routeEnvironment.Contains('ComSpec');comSpecEmpty=[string]::IsNullOrEmpty($routeEnvironment['ComSpec']);events=$events}|ConvertTo-Json -Depth 10|Set-Content (Join-Path $owned 'setup-evidence/native-route-observation.json')
      Require (-not(TestFixtureWindowsInvocation @{kind='download';url='fixture'} $null)-and-not(TestFixtureWindowsInvocation @{kind='download';url='fixture'} '')) 'Metadata mistaken for a native command'
      Require (TestFixtureWindowsInvocation @{kind='native';file='cmd.exe'} $null) 'Windows command without ComSpec was missed'
      Require (TestFixtureWindowsInvocation @{kind='native';file='C:\synthetic\cmd.exe'} 'C:\synthetic\cmd.exe') 'Defined Windows command was missed'
