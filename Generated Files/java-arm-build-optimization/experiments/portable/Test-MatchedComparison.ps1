@@ -1,9 +1,15 @@
-param([string]$SetupTestRoot=$env:COMPARISON_SETUP_TEST_ROOT,[string]$CompleteArtifactReference)
+param([string]$SetupTestRoot=$env:COMPARISON_SETUP_TEST_ROOT,[string]$CompleteArtifactReference,[string]$TestUnexpectedCheck)
 $ErrorActionPreference='Stop'
 $runner=Join-Path $PSScriptRoot 'Invoke-MatchedComparison.ps1'
 . $runner -LibraryOnly
 $passed=[Collections.Generic.List[string]]::new()
-function Check([string]$Name,[scriptblock]$Body){& $Body;$passed.Add($Name)}
+function Check([string]$Name,[scriptblock]$Body){
+    $prior=PortableEnvironmentSnapshot
+    try{& $Body;$passed.Add($Name)}
+    finally{
+        if($SetupTestRoot){New-Item $SetupTestRoot -ItemType Directory -Force|Out-Null;$after=PortableEnvironmentSnapshot;@{check=$Name;beforePresent=$prior.Contains('JAVA_HOME');afterPresent=$after.Contains('JAVA_HOME');equal=($prior.Contains('JAVA_HOME')-eq$after.Contains('JAVA_HOME')-and[string]::Equals($prior['JAVA_HOME'],$after['JAVA_HOME'],[StringComparison]::Ordinal))}|ConvertTo-Json -Compress|Add-Content (Join-Path $SetupTestRoot 'check-home-trace.jsonl')}
+    }
+}
 function Rejects([scriptblock]$Body,[string]$ExpectedMessage=''){
     $threw=$false
     try{& $Body}catch{$threw=$true;if($ExpectedMessage){Require ($_.Exception.Message-like"*$ExpectedMessage*") "Wrong rejection: $($_.Exception.Message)"}}
@@ -660,12 +666,14 @@ Check 'Actual workflow setup retains failed diagnostics and success leaves runne
     $ast=[Management.Automation.Language.Parser]::ParseInput($workflowRuns['Explicit driver setup, checksum and Windows ARM64 compiler preflight'],[ref]$tokens,[ref]$errors)
     $functions=($ast.EndBlock.Statements|Where-Object {$_-is[Management.Automation.Language.FunctionDefinitionAst]}|ForEach-Object {$_.Extent.Text})-join"`n"
     Require ($functions-match'function Invoke-ComparisonSetup') 'Actual workflow setup implementation absent'
-    $saved=@{};foreach($n in 'GITHUB_WORKSPACE','GITHUB_ENV','JAVA_HOME','WORKLOAD','ComSpec','ProgramFiles(x86)','CHECKOUT_OUTCOME','JAVA_OUTCOME','STATIC_OUTCOME','DRIVER_OUTCOME'){$saved[$n]=[Environment]::GetEnvironmentVariable($n)}
+    $setupNames=@('GITHUB_WORKSPACE','GITHUB_ENV','JAVA_HOME','WORKLOAD','ComSpec','ProgramFiles(x86)','CHECKOUT_OUTCOME','JAVA_OUTCOME','STATIC_OUTCOME','DRIVER_OUTCOME')
+    $saved=PortableEnvironmentSnapshot
     try {
         foreach($scenario in 'checksum','missing-compiler','native-failure','success'){
             $caseRoot=Join-Path $SetupTestRoot ($scenario+'-'+[guid]::NewGuid().ToString('N'))
             New-Item $caseRoot -ItemType Directory -Force|Out-Null
             $env:GITHUB_WORKSPACE=$caseRoot;$env:GITHUB_ENV=Join-Path $caseRoot 'github-env';$env:JAVA_HOME=Join-Path $caseRoot 'mock-jdk';$env:WORKLOAD='current17'
+            if($TestUnexpectedCheck-ceq'workflow-setup-seeded'){throw 'SYNTHETIC_FULL_SUITE_SETUP_FAILURE'}
             $env:ComSpec=Join-Path $caseRoot 'mock-cmd.exe';[Environment]::SetEnvironmentVariable('ProgramFiles(x86)',$caseRoot)
             $module=New-Module -ArgumentList $functions,$caseRoot,$scenario -ScriptBlock {
                 param($definitions,$fixtureRoot,$fixtureCase)
@@ -735,7 +743,7 @@ Check 'Actual workflow setup retains failed diagnostics and success leaves runne
         $record=Get-Content (Join-Path $javaFailure 'comparison-owned/setup-evidence/setup.json') -Raw|ConvertFrom-Json
         Require ($record.status-eq'FAIL' -and $record.stage-eq'java' -and $null-eq$record.nativeExitCode -and $record.jdk-eq'not-observed') 'setup-java action failure evidence lost or identity invented'
         Require (-not(Test-Path (Join-Path $javaFailure 'comparison-owned/evidence'))) 'Early setup action precreated runner output'
-    } finally {foreach($n in $saved.Keys){[Environment]::SetEnvironmentVariable($n,$saved[$n])}}
+    } finally {$setupRestore=RestorePortableEnvironment $saved $setupNames;Require $setupRestore.restored 'Workflow setup fixture environment restoration failed'}
 }
 Check 'Opt-in complete portable artifact schema, real optional reference and explicit synthetic cross-host failures' {
     $base=if($SetupTestRoot){$SetupTestRoot}else{Join-Path $env:GITHUB_WORKSPACE 'comparison-owned/setup-evidence/mock-tests'}
