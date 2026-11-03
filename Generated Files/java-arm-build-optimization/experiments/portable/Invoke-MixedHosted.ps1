@@ -24,10 +24,19 @@ function MixedHostedHost {
     $record.powershell=$PSVersionTable.PSVersion.ToString();$record.dotnet=[Environment]::Version.ToString()
     return $record
 }
-function AssertMixedHostedHash($Path,$Expected,$Setup,$Algorithm='SHA256') {
+function MixedHostedEvidenceName([string]$Name) {
+    Require ($Name-and$Name-notin@('.','..')-and$Name-notmatch'[\\/]') 'Unsafe evidence source name'
+    if($Name.StartsWith('.')){Require ($Name-ceq'.gitattributes') 'Unrecognized hidden evidence source';return 'allowlisted-gitattributes'}
+    return $Name
+}
+function AssertMixedHostedHash($Path,$Expected,$Setup,$Algorithm='SHA256',[string]$RetainedPath='') {
+    $logicalName=Split-Path $Path -Leaf;$safeName=MixedHostedEvidenceName $logicalName
     $actual=MixedHostedHash $Path $Algorithm
-    @{path=$Path;expected=$Expected;actual=$actual;algorithm=$Algorithm}|ConvertTo-Json|Set-Content (Join-Path $Setup ((Split-Path $Path -Leaf)+".$Algorithm.hash.json"))
-    if($actual-cne$Expected){$bad=Join-Path $Setup 'mismatched-bytes';New-Item $bad -ItemType Directory -Force|Out-Null;Copy-Item $Path (Join-Path $bad (Split-Path $Path -Leaf));throw 'Hosted checksum mismatch; actual bytes retained'}
+    $bytes=(Get-Item $Path -Force).Length;$retainedHash=$null;$retainedBytes=$null
+    if($RetainedPath){$retainedHash=MixedHostedHash $RetainedPath $Algorithm;$retainedBytes=(Get-Item $RetainedPath -Force).Length}
+    $bound=(-not$RetainedPath-or($retainedHash-ceq$actual-and$retainedBytes-eq$bytes))
+    @{path=$Path;logicalName=$logicalName;expected=$Expected;actual=$actual;bytes=$bytes;algorithm=$Algorithm;retainedPath=$RetainedPath;retainedActual=$retainedHash;retainedBytes=$retainedBytes;copyBound=$bound}|ConvertTo-Json|Set-Content (Join-Path $Setup ($safeName+".$Algorithm.hash.json"))
+    if($actual-cne$Expected-or-not$bound){$bad=Join-Path $Setup 'mismatched-bytes';New-Item $bad -ItemType Directory -Force|Out-Null;Copy-Item $Path (Join-Path $bad $safeName);throw 'Hosted checksum mismatch; actual bytes retained'}
 }
 function AssertMixedHostedPayload($Root,$Setup) {
     Copy-Item (Join-Path $Root 'mixed-payload-sha256.json') (Join-Path $Setup 'payload-manifest-actual.json')
@@ -37,8 +46,9 @@ function AssertMixedHostedPayload($Root,$Setup) {
         Same @($row.PSObject.Properties.Name|Sort-Object) @('file','sha256') 'Payload manifest fields differ'
         Require (($row.file-ceq'.gitattributes'-or$row.file-cmatch'^[A-Za-z0-9][A-Za-z0-9.-]+$')-and$row.file-notin@('.','..')) 'Unsafe payload manifest path'
         $path=Join-Path $Root $row.file;$actual=Join-Path $Setup 'payload-actual';New-Item $actual -ItemType Directory -Force|Out-Null
-        Copy-Item $path (Join-Path $actual $row.file)
-        AssertMixedHostedHash $path $row.sha256 $Setup
+        $retained=Join-Path $actual (MixedHostedEvidenceName $row.file)
+        Copy-Item $path $retained
+        AssertMixedHostedHash $path $row.sha256 $Setup SHA256 $retained
     }
 }
 function InvokeMixedHosted([string]$Stage,[string]$Os,[string]$Owned,[string]$Jdk,[switch]$OnlyPlan) {

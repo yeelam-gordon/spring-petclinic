@@ -7,4 +7,5 @@ Test-MixedHosted.ps1 -text
 mixed-client-package.workflow.yml -text
 mixed-payload-sha256.json -text
 .gitattributes -text
+mixed-client-mac-reference.workflow.yml -text
 matched-comparison.workflow.yml -text

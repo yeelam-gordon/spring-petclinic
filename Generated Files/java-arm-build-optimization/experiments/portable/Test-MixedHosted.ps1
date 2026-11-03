@@ -127,4 +127,32 @@ $badSetup=Join-Path $FixtureRoot 'payload-failure';New-Item $badSetup -ItemType 
 $rejected=$false;try{AssertMixedHostedPayload $badClone $badSetup}catch{$rejected=$true}
 Require ($rejected-and(Test-Path (Join-Path $badSetup 'mismatched-bytes/Invoke-MatchedComparison.ps1'))) 'Payload actual mismatch bytes not retained'
 $gitProof|ConvertTo-Json|Set-Content (Join-Path $FixtureRoot 'git-byte-proof.json')
+$capture=Join-Path $FixtureRoot 'future-visible-capture';New-Item $capture -ItemType Directory|Out-Null
+AssertMixedHostedPayload $repo $capture
+$uploadFiles=@(Get-ChildItem $capture -Recurse -Force -File|Where-Object{
+    $relative=[IO.Path]::GetRelativePath($capture,$_.FullName)
+    -not@($relative.Split([IO.Path]::DirectorySeparatorChar)|Where-Object{$_.StartsWith('.')}).Count
+})
+$rows=Get-Content (Join-Path $repo 'mixed-payload-sha256.json') -Raw|ConvertFrom-Json
+$visibleProof=@()
+foreach($row in $rows){
+    $safe=MixedHostedEvidenceName $row.file;$copy=Join-Path $capture "payload-actual/$safe";$receipt=Join-Path $capture "$safe.SHA256.hash.json"
+    Require ($copy-cin$uploadFiles.FullName-and$receipt-cin$uploadFiles.FullName) 'Default hidden-path filtering dropped required payload or receipt'
+    $record=Get-Content $receipt -Raw|ConvertFrom-Json
+    Require ($record.logicalName-ceq$row.file-and$record.expected-ceq$row.sha256-and$record.actual-ceq$row.sha256-and$record.retainedActual-ceq$row.sha256-and$record.copyBound-and$record.bytes-eq(Get-Item $copy).Length-and(Get-FileHash $copy).Hash-ceq$row.sha256) 'Logical/copy/hash receipt binding differs'
+    $visibleProof+=,@{logicalName=$row.file;retained=$copy;receipt=$receipt;sha256=$record.actual;bytes=$record.bytes;survivesDefaultHiddenExclusion=$true}
+}
+foreach($badName in @('.env','../escape','..\escape','.','..')){$rejected=$false;try{$null=MixedHostedEvidenceName $badName}catch{$rejected=$true};Require $rejected 'Unknown/unsafe evidence role admitted'}
+$attribute=Join-Path $repo '.gitattributes';$expectedAttribute=(Get-FileHash $attribute).Hash
+$copyFailure=Join-Path $FixtureRoot 'copy-binding-failure';New-Item $copyFailure -ItemType Directory|Out-Null
+$wrongCopy=Join-Path $copyFailure 'wrong-copy.raw';[IO.File]::WriteAllText($wrongCopy,'SYNTHETIC_COPY_DISCREPANCY')
+$rejected=$false;try{AssertMixedHostedHash $attribute $expectedAttribute $copyFailure SHA256 $wrongCopy}catch{$rejected=$true}
+Require ($rejected-and-not(Get-Content (Join-Path $copyFailure 'allowlisted-gitattributes.SHA256.hash.json') -Raw|ConvertFrom-Json).copyBound) 'Source/copy discrepancy silently accepted'
+[IO.File]::AppendAllText($attribute,"`n# SYNTHETIC_ATTRIBUTE_HASH_MISMATCH")
+$badCapture=Join-Path $FixtureRoot 'attribute-mismatch';New-Item $badCapture -ItemType Directory|Out-Null
+$rejected=$false;try{AssertMixedHostedPayload $repo $badCapture}catch{$rejected=$true}
+$badBytes=Join-Path $badCapture 'mismatched-bytes/allowlisted-gitattributes';$badReceipt=Join-Path $badCapture 'allowlisted-gitattributes.SHA256.hash.json'
+$record=Get-Content $badReceipt -Raw|ConvertFrom-Json
+Require ($rejected-and(Test-Path $badBytes)-and$record.logicalName-ceq'.gitattributes'-and$record.actual-ceq(Get-FileHash $badBytes).Hash-and$record.actual-cne$record.expected-and$record.copyBound) 'Hidden attribute mismatch lost actual bytes/receipt or did not fail'
+@{scope='FUTURE_CAPTURE_ONLY_not_original_artifact';payloads=$visibleProof;logicalPayloads=8;visibleReceipts=8;attributeMismatchRejected=$true;actualMismatchBytes=$badBytes;actualMismatchReceipt=$badReceipt;copyDiscrepancyRejected=$true;uploadModel='Exclude any path segment starting dot; no broad hidden-file enablement'}|ConvertTo-Json -Depth 8|Set-Content (Join-Path $FixtureRoot 'future-hidden-retention-proof.json')
 Write-Output 'HOSTED_REAL_CONTROLLER_TO_ACTUAL_ENTRYPOINT_PURE_PASS'
