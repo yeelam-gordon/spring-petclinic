@@ -16,6 +16,8 @@ function MixedHostedHash($Path,$Algorithm='SHA256') {(Get-FileHash $Path -Algori
 function MixedHostedUnzip($Path,$Destination) {Expand-Archive $Path $Destination}
 function MixedHostedHost {
     $record=@{platform=$(if($IsWindows){'Windows'}elseif($IsMacOS){'MacOS'}else{'unsupported'});os=[Runtime.InteropServices.RuntimeInformation]::OSDescription;osArchitecture=[Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString();processArchitecture=[Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString();logicalProcessors=[Environment]::ProcessorCount;imageOS=$env:ImageOS;imageVersion=$env:ImageVersion;cpu='UNKNOWN';memory='UNKNOWN';filesystem='UNKNOWN'}
+    $record.hostname='UNKNOWN';$record.hostnameError=$null
+    try{$hostname=[System.Net.Dns]::GetHostName();if([string]::IsNullOrWhiteSpace($hostname)){throw 'OS hostname observation returned an empty value'};$record.hostname=$hostname}catch{$record.hostnameError=$_.ToString()}
     try{if($IsWindows){$record.cpu=@(Get-CimInstance Win32_Processor|Select-Object Name,NumberOfCores,NumberOfLogicalProcessors);$record.memory=(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory}else{$record.cpu=(& sysctl -n machdep.cpu.brand_string);if($LASTEXITCODE){$record.cpu='UNKNOWN'};$record.memory=(& sysctl -n hw.memsize);if($LASTEXITCODE){$record.memory='UNKNOWN'}}}catch{$record.hardwareError=$_.ToString()}
     try{$record.filesystem=[IO.DriveInfo]::new([IO.Path]::GetPathRoot((Get-Location).Path)).DriveFormat}catch{$record.filesystem='UNKNOWN'}
     if($null-eq$record.memory){$record.memory='UNKNOWN'};if(-not$record.cpu){$record.cpu='UNKNOWN'}

@@ -94,6 +94,10 @@ foreach($os in 'Windows','MacOS'){
 }
 $results|ConvertTo-Json -Depth 30|Set-Content (Join-Path $FixtureRoot 'hosted-fixtures.json')
 . (Join-Path $root 'Invoke-MixedHosted.ps1') -LibraryOnly
+$actualHost=MixedHostedHost
+if($actualHost.hostname-ceq'UNKNOWN'){Require (-not[string]::IsNullOrWhiteSpace($actualHost.hostnameError)) 'Unknown hostname needs explicit observation error'}
+else{Require (-not[string]::IsNullOrWhiteSpace($actualHost.hostname)-and$null-eq$actualHost.hostnameError) 'Actual hostname witness is invalid'}
+@{hostname=$actualHost.hostname;hostnameError=$actualHost.hostnameError;source='System.Net.Dns.GetHostName, actual current host';notGitPropertyEcho=$true}|ConvertTo-Json|Set-Content (Join-Path $FixtureRoot 'actual-host-witness.json')
 $repo=Join-Path $FixtureRoot 'git-source';New-Item $repo -ItemType Directory -Force|Out-Null
 $names=@((Get-Content (Join-Path $root 'mixed-payload-sha256.json') -Raw|ConvertFrom-Json).file)+@('mixed-payload-sha256.json')
 foreach($name in $names){Copy-Item (Join-Path $root $name) (Join-Path $repo $name)}
