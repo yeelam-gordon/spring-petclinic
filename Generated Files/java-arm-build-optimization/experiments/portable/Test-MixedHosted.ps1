@@ -72,8 +72,10 @@ foreach($os in 'Windows','MacOS'){
    }
    $before=PortableEnvironmentSnapshot;$cwd=(Get-Location).Path;$caught=$null;$stage=if($case-like'jdk-*'){'Jdk'}else{'Execute'}
    $env:GITHUB_OUTPUT=Join-Path $owned 'synthetic-actions-output'
+   Remove-Item Env:MAVEN_OPTS -ErrorAction SilentlyContinue
+   if($os-eq'Windows'-and-not${env:ProgramFiles(x86)}){${env:ProgramFiles(x86)}=Join-Path $owned 'synthetic Program Files'}
    try{InvokeMixedHosted $stage $os $owned $jdk -OnlyPlan}catch{$caught=$_.ToString()}
-   $null=RestorePortableEnvironment $before @('GITHUB_OUTPUT')
+   finally{$null=RestorePortableEnvironment $before @('GITHUB_OUTPUT','ProgramFiles(x86)','MAVEN_OPTS')}
    $record=Get-Content (Join-Path $owned "setup-evidence/$stage-result.json") -Raw|ConvertFrom-Json
    Require ($record.restoration.restored-and$record.restoration.keys.Count-eq18-and$record.restoration.cwdEqual) 'Hosted finalizer did not restore18 states'
    if($case-eq'positive'){
