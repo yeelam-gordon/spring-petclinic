@@ -1,9 +1,31 @@
 param([Parameter(Mandatory)][string]$FixtureRoot,[string]$Baseline=(Join-Path $PSScriptRoot '..\hobl-contract'),[string]$OriginalWrapper,[switch]$EnvironmentChild,[string]$PatchedDriver)
 $ErrorActionPreference='Stop';$PSNativeCommandUseErrorActionPreference=$false
+function NativeMatchedScriptPath([string]$Path){
+    $resolved=Resolve-Path -LiteralPath $Path -ErrorAction Stop
+    if(@($resolved).Count-ne1-or$resolved.Provider.Name-ne'FileSystem'-or-not(Test-Path -LiteralPath $resolved.ProviderPath -PathType Leaf)){throw 'One actual filesystem script required'}
+    return $resolved.ProviderPath
+}
+function ReadMatchedAdmission([string]$Workflow){
+    $expression=[regex]::Match($Workflow,'(?m)^\s+if: ([^\r\n]+)').Groups[1].Value
+    if(-not$expression){throw 'Production admission expression missing'}
+    $expression=$expression.Replace('github.repository','$Repository').Replace('inputs.acknowledgement','$Acknowledgement').Replace('inputs.windows_benefit_reviewed','$Reviewed').Replace('inputs.platform_selection','$Selection').Replace('==','-eq').Replace('&&','-and').Replace('||','-or')
+    return [scriptblock]::Create('param($Repository,$Acknowledgement,$Reviewed,$Selection) '+$expression)
+}
+function ReadMatchedRunners([string]$Workflow,[string]$Selection){
+    $expression=[regex]::Match($Workflow,'runner: \$\{\{ fromJSON\((.*?)\) \}\}').Groups[1].Value
+    if(-not$expression){throw 'Production matrix expression missing'}
+    $branches=[regex]::Matches($expression,'inputs\.platform_selection == ''([^'']+)'' && ''([^'']+)''')
+    foreach($branch in $branches){if($Selection-eq$branch.Groups[1].Value){return @($branch.Groups[2].Value|ConvertFrom-Json)}}
+    $fallback=[regex]::Match($expression,'\|\| ''([^'']+)''$')
+    if(-not$fallback.Success){throw 'Production matrix fallback missing'}
+    return @($fallback.Groups[1].Value|ConvertFrom-Json)
+}
 if($EnvironmentChild){
     New-Item $FixtureRoot -ItemType Directory|Out-Null
+    $PatchedDriver=NativeMatchedScriptPath $PatchedDriver
     . $PatchedDriver -LibraryOnly
     $tokens=$null;$errors=$null;$driverAst=[Management.Automation.Language.Parser]::ParseFile($PatchedDriver,[ref]$tokens,[ref]$errors)
+    @{nativePath=$PatchedDriver;errors=@($errors|ForEach-Object {@{id=$_.ErrorId;message=$_.Message;file=$_.Extent.File;line=$_.Extent.StartLineNumber;column=$_.Extent.StartColumnNumber;text=$_.Extent.Text}})}|ConvertTo-Json -Depth 10|Set-Content "$FixtureRoot\parser-proof.json"
     Require ($errors.Count-eq0) 'Child driver syntax failed'
     $namesNode=$driverAst.Find({param($n)$n-is[Management.Automation.Language.AssignmentStatementAst]-and$n.Extent.Text.StartsWith('$managedEnvironmentNames=@(')},$true)
     . ([scriptblock]::Create($namesNode.Extent.Text))
@@ -54,7 +76,7 @@ $patch=(Resolve-Path "$PSScriptRoot\matched-after.patch").Path
 git -C $FixtureRoot init --quiet;if($LASTEXITCODE){throw 'Owned fixture Git init failed'}
 git -C $FixtureRoot apply --check --directory=core $patch;if($LASTEXITCODE){throw 'Patch check failed'}
 git -C $FixtureRoot apply --directory=core $patch;if($LASTEXITCODE){throw 'Owned-copy patch failed'}
-$runner="$FixtureRoot\core\Invoke-HoblContract.ps1"
+$runner=NativeMatchedScriptPath (Join-Path (Join-Path $FixtureRoot 'core') 'Invoke-HoblContract.ps1')
 . $runner -LibraryOnly
 $sha='655A91268C8DE0B8B233492F49014F9F3975BCABE7B0B8B2DC5C22A8E26EAEBA'
 $pom='A41D9CC2B0287AA03BCE5205171B111FD1620A4DD6DCF48D9624A189B50F1E0D'
@@ -80,8 +102,27 @@ foreach($case in @(@{mode=$false;windows=$true;dirty=' M mvnw.cmd';hash=$sha;pom
     $rejected=$false;try{AssertHoblSourceMode $case.mode $case.windows $case.dirty $case.hash $case.pom}catch{$rejected=$true}
     Require $rejected 'Source mode negative accepted';$rejects+=@{input=$case;rejected=$true}
 }
-$tokens=$null;$errors=$null;$newAst=[Management.Automation.Language.Parser]::ParseFile($runner,[ref]$tokens,[ref]$errors);Require ($errors.Count-eq0) 'Patched syntax invalid'
-$oldAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $Baseline 'Invoke-HoblContract.ps1'),[ref]$tokens,[ref]$errors)
+$tokens=$null;$errors=$null;$newAst=[Management.Automation.Language.Parser]::ParseFile($runner,[ref]$tokens,[ref]$errors)
+@{nativePath=$runner;errors=@($errors|ForEach-Object {@{id=$_.ErrorId;message=$_.Message;file=$_.Extent.File;line=$_.Extent.StartLineNumber;column=$_.Extent.StartColumnNumber;text=$_.Extent.Text}})}|ConvertTo-Json -Depth 10|Set-Content "$FixtureRoot\parser-proof.json"
+Require ($errors.Count-eq0) 'Patched syntax invalid'
+$oldAst=[Management.Automation.Language.Parser]::ParseFile((NativeMatchedScriptPath (Join-Path $Baseline 'Invoke-HoblContract.ps1')),[ref]$tokens,[ref]$errors)
+& {
+    $drive='NativePath'+[Guid]::NewGuid().ToString('N')
+    New-PSDrive -Name $drive -PSProvider FileSystem -Root "$FixtureRoot\core" -Scope Local|Out-Null
+    try{
+        $providerPath=$drive+':\Invoke-HoblContract.ps1'
+        Require (Test-Path -LiteralPath $providerPath) 'Provider fixture not an existing file'
+        $t=$null;$badErrors=$null;$null=[Management.Automation.Language.Parser]::ParseFile($providerPath,[ref]$t,[ref]$badErrors)
+        Require ($badErrors.Count-gt0-and$badErrors[0].ErrorId-eq'FileReadError') 'Old native/provider boundary did not fail as expected'
+        $native=NativeMatchedScriptPath $providerPath
+        $t=$null;$fixedErrors=$null;$null=[Management.Automation.Language.Parser]::ParseFile($native,[ref]$t,[ref]$fixedErrors)
+        Require ($fixedErrors.Count-eq0-and(Get-FileHash $native).Hash-eq(Get-FileHash $runner).Hash) 'Native-path fix changed bytes or still failed'
+        $malformed=Join-Path $FixtureRoot 'malformed-script.ps1';[IO.File]::WriteAllText($malformed,'function Broken {')
+        $t=$null;$syntaxErrors=$null;$null=[Management.Automation.Language.Parser]::ParseFile((NativeMatchedScriptPath $malformed),[ref]$t,[ref]$syntaxErrors)
+        Require ($syntaxErrors.Count-gt0) 'Genuine syntax errors bypassed'
+        @{oldErrorId=$badErrors[0].ErrorId;oldMessage=$badErrors[0].Message;oldLine=$badErrors[0].Extent.StartLineNumber;oldColumn=$badErrors[0].Extent.StartColumnNumber;oldSource=$badErrors[0].Extent.File;fixedNativePath=$native;fixedErrors=0;identicalBytes=$true;genuineSyntaxRejected=$true}|ConvertTo-Json -Depth 10|Set-Content "$FixtureRoot\native-path-regression.json"
+    }finally{Remove-PSDrive $drive}
+}
 foreach($name in 'Phase','ContractArguments'){
     $old=$oldAst.Find({param($n)$n-is[Management.Automation.Language.FunctionDefinitionAst]-and$n.Name-eq$name},$true)
     $new=$newAst.Find({param($n)$n-is[Management.Automation.Language.FunctionDefinitionAst]-and$n.Name-eq$name},$true)
@@ -150,7 +191,26 @@ Require ($LASTEXITCODE-eq0) 'Isolated child actual eleven-key production restora
 & (Get-Process -Id $PID).Path -NoProfile -File "$FixtureRoot\core\Test-HoblContract.ps1" -FixtureRoot "$FixtureRoot\original17" *> "$FixtureRoot\original17.log"
 Require ($LASTEXITCODE-eq0) 'Original17 static suite failed against patched copy'
 $workflow=Get-Content "$PSScriptRoot\matched-after.workflow.yml" -Raw
-Require ($workflow.Contains('runner: [windows-11-arm, macos-15]')-and$workflow.Contains('-WindowsPreferPwsh:$IsWindows')-and$workflow.Contains('inputs.windows_benefit_reviewed')-and$workflow.Contains('environment: hobl-contract-approval')) 'Matched manual platform gate missing'
+Require ($workflow.Contains('-WindowsPreferPwsh:$IsWindows')-and$workflow.Contains('inputs.windows_benefit_reviewed')-and$workflow.Contains('environment: hobl-contract-approval')) 'Matched manual platform gate missing'
+Require ($workflow.Contains('default: Both')-and$workflow.Contains('options: [Both, MacOnly]')) 'Platform selection default changed'
+$admission=ReadMatchedAdmission $workflow
+$platformCases=@()
+foreach($selection in @('Both','MacOnly','INVALID','',$null)){
+    $admitted=[bool](& $admission 'yeelam-gordon/spring-petclinic' 'I_HAVE_APPROVAL_AND_BUDGET' $true $selection)
+    $runners=@(ReadMatchedRunners $workflow $selection)
+    $valid=$selection-in@('Both','MacOnly')
+    Require ($admitted-eq$valid) 'Actual production admission accepted invalid/empty selector'
+    if($selection-eq'Both'){Same $runners @('windows-11-arm','macos-15') 'Both default changed'}
+    elseif($selection-eq'MacOnly'){Same $runners @('macos-15') 'MacOnly must create only Mac'}
+    else{Require ($runners.Count-eq0) 'Invalid selector falls through to Windows/Both'}
+    $platformCases+=@{selection=$selection;admitted=$admitted;runners=$runners}
+}
+foreach($selection in 'Both','MacOnly'){
+    Require (-not(& $admission 'not-owner/repo' 'I_HAVE_APPROVAL_AND_BUDGET' $true $selection)) 'Platform OR bypasses owner guard'
+    Require (-not(& $admission 'yeelam-gordon/spring-petclinic' 'wrong-ack' $true $selection)) 'Platform OR bypasses acknowledgement'
+    Require (-not(& $admission 'yeelam-gordon/spring-petclinic' 'I_HAVE_APPROVAL_AND_BUDGET' $false $selection)) 'Platform OR bypasses benefit review'
+}
+$platformCases|ConvertTo-Json -Depth 10|Set-Content "$FixtureRoot\platform-admission.json"
 Require ($workflow.Contains('default: Prototype334')-and$workflow.Contains('UpstreamF62f442HttpsLicense')-and$workflow.Contains('-WindowsCandidateRevision $env:WINDOWS_CANDIDATE_REVISION')) 'Explicit HTTPS paired-cohort input missing'
 @{exit=0;patchApply=$true;syntax=$true;positiveMode=$true;httpsCandidateSha256=$https;httpsPositiveAndCrossVariantRejection=$true;noHttpAncestryPositiveNegative=$true;httpsOriginalWrapperRestoration=$true;elevenKeyActualInnerOuterChildExit=0;depth10ConcreteReceipts=$true;negativeCases=$rejects;actualSourceGateBothModes=$true;hostWindows=[bool]$IsWindows;preferredProductionExpectation=$(if($IsWindows){'success-and-selector-loss-rejection'}else{'Windows-only-rejection'});defaultProductionExpectation='success';macTimerArgvFiveLoopAstUnchanged=$true;original17Exit=0;javaMavenBootstrap=$false}|ConvertTo-Json -Depth 6|Set-Content "$FixtureRoot\results.json"
 $global:LASTEXITCODE=0

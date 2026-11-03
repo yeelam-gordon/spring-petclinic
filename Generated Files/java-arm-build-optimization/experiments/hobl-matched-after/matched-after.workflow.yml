@@ -18,17 +18,23 @@ on:
         required: true
         default: Prototype334
         options: [Prototype334, UpstreamF62f442HttpsLicense]
+      platform_selection:
+        description: Both unchanged by default; MacOnly requires separately approved targeted budget
+        type: choice
+        required: true
+        default: Both
+        options: [Both, MacOnly]
 permissions:
   contents: read
 jobs:
   baseline:
-    if: github.repository == 'yeelam-gordon/spring-petclinic' && inputs.acknowledgement == 'I_HAVE_APPROVAL_AND_BUDGET' && inputs.windows_benefit_reviewed
+    if: github.repository == 'yeelam-gordon/spring-petclinic' && inputs.acknowledgement == 'I_HAVE_APPROVAL_AND_BUDGET' && inputs.windows_benefit_reviewed && (inputs.platform_selection == 'Both' || inputs.platform_selection == 'MacOnly')
     environment: hobl-contract-approval
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        runner: [windows-11-arm, macos-15]
+        runner: ${{ fromJSON(inputs.platform_selection == 'MacOnly' && '["macos-15"]' || inputs.platform_selection == 'Both' && '["windows-11-arm","macos-15"]' || '[]') }}
     runs-on: ${{ matrix.runner }}
     defaults:
       run:
