@@ -35,6 +35,12 @@ foreach($os in 'Windows','MacOS'){
    param($root,$FixtureRoot,$os,$case)
    Export-ModuleMember -Function @() -Alias @() -Variable @()
    . (Join-Path $root 'Invoke-MixedHosted.ps1') -LibraryOnly
+   function TestFixtureWindowsInvocation($Event,[string]$ComSpec){
+    if($Event.kind-cne'native'){return $false}
+    $file=[string]$Event.file
+    Require (-not[string]::IsNullOrWhiteSpace($file)) 'Native fixture event has no command'
+    return ((-not[string]::IsNullOrWhiteSpace($ComSpec)-and[string]::Equals($file,$ComSpec,[StringComparison]::OrdinalIgnoreCase))-or$file-imatch'(^|[\\/])cmd\.exe$')
+   }
    $owned=Join-Path $FixtureRoot ("$os-$case-"+[guid]::NewGuid().ToString('N'));$jdk=Join-Path $owned 'native jdk'
    New-Item $jdk -ItemType Directory -Force|Out-Null
    $events=@()
@@ -84,7 +90,16 @@ foreach($os in 'Windows','MacOS'){
     Require ($record.status-eq'PASS'-and-not$caught) "Hosted positive failed: $caught"
     $plan=Get-Content (Join-Path $owned 'setup-evidence/collector-entrypoint-output.log') -Raw|ConvertFrom-Json
     Require ($plan.comparison-eq'MixedClientPackage'-and$plan.sourcePin-eq'500158f732419217507c7656904b8e6aa1bcc0d6'-and$plan.samples-eq3-and$plan.loopbackTests) 'Actual collector entrypoint forwarding failed'
-    Require ($(if($os-eq'Windows'){$plan.candidate.EndsWith('mvnd.cmd')}else{$plan.candidate.EndsWith('bin/mvnd')-and-not@($events|Where-Object{$_.file-eq$env:ComSpec}).Count})) 'Unix/native route crossed Windows API boundary'
+    if($os-eq'Windows'){Require ($plan.candidate.EndsWith('mvnd.cmd')) 'Windows JVM route differs'}
+    else{
+     @{candidate=$plan.candidate;comSpecPresent=[Environment]::GetEnvironmentVariables().Contains('ComSpec');comSpecEmpty=[string]::IsNullOrEmpty($env:ComSpec);events=$events}|ConvertTo-Json -Depth 10|Set-Content (Join-Path $owned 'setup-evidence/native-route-observation.json')
+     Require (-not(TestFixtureWindowsInvocation @{kind='download';url='fixture'} $null)-and-not(TestFixtureWindowsInvocation @{kind='download';url='fixture'} '')) 'Metadata mistaken for a native command'
+     Require (TestFixtureWindowsInvocation @{kind='native';file='cmd.exe'} $null) 'Windows command without ComSpec was missed'
+     Require (TestFixtureWindowsInvocation @{kind='native';file='C:\synthetic\cmd.exe'} 'C:\synthetic\cmd.exe') 'Defined Windows command was missed'
+     $ambiguousRejected=$false;try{$null=TestFixtureWindowsInvocation @{kind='native';file=$null} $null}catch{$ambiguousRejected=$_.ToString()-like'*Native fixture event has no command*'}
+     Require $ambiguousRejected 'Ambiguous native command was accepted'
+     Require ($plan.candidate.EndsWith('bin/mvnd')-and-not@($events|Where-Object{TestFixtureWindowsInvocation $_ $env:ComSpec}).Count) 'Unix/native route crossed Windows API boundary'
+    }
    }elseif($case-eq'jdk-positive'){Require ($record.status-eq'PASS'-and-not$caught-and(Get-Content (Join-Path $owned 'synthetic-actions-output') -Raw)-match'javaVersion=17.0.21') 'JDK output forwarding failed'}
    else{Require ($record.status-eq'FAIL'-and$caught) 'Setup/child failure became success'}
    if($case-eq'bad-hash'){Require (Test-Path (Join-Path $owned 'setup-evidence/mismatched-bytes/vendor.zip')) 'Bad actual bytes lost'}
