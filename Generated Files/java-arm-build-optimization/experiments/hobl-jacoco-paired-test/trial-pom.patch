@@ -1,0 +1,24 @@
+diff --git a/pom.xml b/pom.xml
+index 27bf956..d70c61c 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -33,6 +33,7 @@
+     <checkstyle.version>11.1.0</checkstyle.version>
+     <error-prone.version>2.42.0</error-prone.version>
+     <jacoco.version>0.8.13</jacoco.version>
++    <jacoco.instrumentation.includes>*</jacoco.instrumentation.includes>
+     <libsass.version>0.3.4</libsass.version>
+     <lifecycle-mapping>1.0.0</lifecycle-mapping>
+     <maven-checkstyle.version>3.6.0</maven-checkstyle.version>
+@@ -257,6 +258,11 @@
+             <goals>
+               <goal>prepare-agent</goal>
+             </goals>
++            <configuration>
++              <includes>
++                <include>${jacoco.instrumentation.includes}</include>
++              </includes>
++            </configuration>
+           </execution>
+           <execution>
+             <id>report</id>
