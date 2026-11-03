@@ -1,0 +1,85 @@
+# INACTIVE. One Mac14 reference cohort only; Windows r3 remains CLOSED NO ADVANCE.
+name: Reviewed current17 Mac14 reference acquisition
+on:
+  workflow_dispatch:
+    inputs:
+      authority:
+        description: Exact approved one-Mac-job reference budget acknowledgement
+        required: true
+        type: string
+      payload_sha:
+        description: Reviewed owned-branch payload SHA
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  mac_reference:
+    if: >-
+      inputs.authority == 'I_APPROVE_1_MAC_REFERENCE_JOB_60_MINUTES_NO_RETRY' &&
+      inputs.payload_sha == github.sha &&
+      github.ref == 'refs/heads/perf/arm64-matched-comparison' &&
+      github.event.repository.fork == true &&
+      github.repository_owner == github.actor
+    environment: matched-comparison-approval
+    timeout-minutes: 60
+    runs-on: macos-14
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        id: checkout
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Static self-contained suite, no Java
+        id: static
+        run: |
+          $root=Join-Path $env:GITHUB_WORKSPACE 'comparison-owned'
+          $setup=Join-Path $root 'setup-evidence'
+          New-Item $setup -ItemType Directory -Force | Out-Null
+          $head=(& git -C $env:GITHUB_WORKSPACE rev-parse HEAD).Trim()
+          if($LASTEXITCODE -ne 0 -or $head -cne $env:GITHUB_SHA){throw 'Checked-out payload differs from dispatch SHA'}
+          @{actualHead=$head;dispatchSha=$env:GITHUB_SHA;ref=$env:GITHUB_REF;workflowRef=$env:GITHUB_WORKFLOW_REF} | ConvertTo-Json | Set-Content (Join-Path $setup 'payload-checkout.json')
+          & './Generated Files/java-arm-build-optimization/experiments/portable/Test-MatchedComparison.ps1' -SetupTestRoot (Join-Path $root 'pure-fixtures')
+          & './Generated Files/java-arm-build-optimization/experiments/portable/Test-MixedHosted.ps1' -FixtureRoot (Join-Path $root 'hosted-fixtures')
+      - name: Pinned ARM JDK archive
+        id: jdk
+        run: |
+          & './Generated Files/java-arm-build-optimization/experiments/portable/Invoke-MixedHosted.ps1' -Stage Jdk -Platform MacOS -OwnedDirectory (Join-Path $env:GITHUB_WORKSPACE 'comparison-owned')
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        id: java
+        with:
+          distribution: jdkfile
+          jdkFile: ${{ steps.jdk.outputs.jdkFile }}
+          architecture: aarch64
+          java-version: ${{ steps.jdk.outputs.javaVersion }}
+          check-latest: false
+      - name: Fresh public native driver and unchanged no-op collector
+        id: execute
+        run: |
+          & './Generated Files/java-arm-build-optimization/experiments/portable/Invoke-MixedHosted.ps1' -Stage Execute -Platform MacOS -OwnedDirectory (Join-Path $env:GITHUB_WORKSPACE 'comparison-owned') -JdkPath $env:JAVA_HOME
+      - name: Retain final action outcomes even setup failed
+        if: always()
+        env:
+          ACTION_CHECKOUT: ${{ steps.checkout.outcome }}
+          ACTION_STATIC: ${{ steps.static.outcome }}
+          ACTION_JDK: ${{ steps.jdk.outcome }}
+          ACTION_JAVA: ${{ steps.java.outcome }}
+          ACTION_EXECUTE: ${{ steps.execute.outcome }}
+        run: |
+          $setup=Join-Path $env:GITHUB_WORKSPACE 'comparison-owned/setup-evidence'
+          New-Item $setup -ItemType Directory -Force | Out-Null
+          @{checkout=$env:ACTION_CHECKOUT;static=$env:ACTION_STATIC;jdk=$env:ACTION_JDK;java=$env:ACTION_JAVA;execute=$env:ACTION_EXECUTE;payloadSha=$env:GITHUB_SHA;run=$env:GITHUB_RUN_ID;attempt=$env:GITHUB_RUN_ATTEMPT} | ConvertTo-Json | Set-Content (Join-Path $setup 'action-outcomes.json')
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: mac14-reference-current17-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            comparison-owned/setup-evidence
+            comparison-owned/evidence
+            comparison-owned/pure-fixtures
+            comparison-owned/hosted-fixtures
+          if-no-files-found: error
+          retention-days: 7
