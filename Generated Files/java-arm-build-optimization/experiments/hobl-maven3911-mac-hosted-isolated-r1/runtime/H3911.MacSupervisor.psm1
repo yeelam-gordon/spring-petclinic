@@ -8,7 +8,7 @@ function Read-SupJson([string]$Path){
 }
 function Assert-SupBase {
     $manifest=Join-Path $PSScriptRoot 'mac-qualifier-sha256.json'
-    & ${function:Assert-Sup} ((Microsoft.PowerShell.Utility\Get-FileHash $manifest).Hash-ceq'F791C358A6F44481F8BE5116BB805E69FF4EC38DB489BD9556A3E806CC747F41') 'Frozen Mac source manifest differs'
+    & ${function:Assert-Sup} ((Microsoft.PowerShell.Utility\Get-FileHash $manifest).Hash-ceq'F7895105FCB4236CA74CB65F722F7189A8FD58978C9163F4CDE0FC7C3C3F3765') 'Frozen Mac source manifest differs'
     $rows=Get-Content $manifest -Raw|ConvertFrom-Json -AsHashtable -DateKind String
     & ${function:Assert-Sup} ($rows-is[array]-and$rows.Count-eq18) 'Exact frozen source closure required'
     foreach($row in $rows){& ${function:Assert-Sup} ($row.file-is[string]-and$row.file-notmatch'[/\\:]|^\.'-and(Microsoft.PowerShell.Utility\Get-FileHash (Join-Path $PSScriptRoot $row.file)).Hash-ceq$row.sha256) 'Frozen Mac payload differs'}
@@ -55,7 +55,7 @@ function Invoke-SupNativeCleanup($R){
     $c=@{Jdk=$R.inputs.Jdk;Home=(Join-Path $R.qualifierOwned 'home');Registry=(Join-Path $R.qualifierOwned 'registry');Temp=(Join-Path $R.qualifierOwned 'temp');Output=(Join-Path $R.owned 'native-cleanup');KnownOwnedIdentities=@();ExpectedJavaSha256='827ECF403DBFA3CF88E7310B44AD93CB27B75C7E15A7E461DDE0CEE775BB196F';ExpectedJcmdSha256='2D4CB05FEFFBB7F81D6EB5295A84D0DA8B9098AC1A0BD9C314B87585E9498C1A'}
     New-Item $c.Output -ItemType Directory -ErrorAction Stop|Out-Null
     $regCmd=& ${function:Get-SupCommand} 'H3911.DarwinOwner.psm1' 'Read-H3911Registry103' 'E9A8FD932AC839119FDD0B810533E8FB69BA314CB038E7345C484A7988A36E1E'
-    $censusCmd=& ${function:Get-SupCommand} 'H3911.DarwinLifecycle.psm1' 'Read-H3911DarwinScopedCensus' 'AD420580D1F4E98350ADF94102BE43C96EEF9A5CC3086DC5C0F33DB493C5E66A'
+    $censusCmd=& ${function:Get-SupCommand} 'H3911.DarwinLifecycle.psm1' 'Read-H3911DarwinScopedCensus' '4825B8C82458934A503B181E9756C03934045B803AD482F7C8BF9230680316E2'
     $out=@{status='HOLD';parentAuxiliaryJcmdMaximum=2;parentEffectiveOwnerReads=0;registryEdited=$false;extraMavenCalls=0;historicalDescendantsAbsent=$false}
     try{
         $reg=& $regCmd ([IO.File]::ReadAllBytes((Join-Path $c.Registry 'registry.bin')))
@@ -63,7 +63,7 @@ function Invoke-SupNativeCleanup($R){
         if($R.mainReturned){
             $record=& ${function:Read-SupJson} (Join-Path $R.qualifierOwned 'mac-qualifier.json');$null=& ${function:Assert-SupQualification} $record
             & ${function:Assert-Sup} ($reg.count-eq0) 'Normal registry zero required'
-            $confirm=& ${function:Get-SupCommand} 'H3911.DarwinLifecycle.psm1' 'Confirm-H3911DarwinCliStop' 'AD420580D1F4E98350ADF94102BE43C96EEF9A5CC3086DC5C0F33DB493C5E66A'
+            $confirm=& ${function:Get-SupCommand} 'H3911.DarwinLifecycle.psm1' 'Confirm-H3911DarwinCliStop' '4825B8C82458934A503B181E9756C03934045B803AD482F7C8BF9230680316E2'
             $facts=& $confirm -Context $c -Expected $record.owner -StopExit 0 -RuntimeApproved
             & ${function:Assert-Sup} ($facts.status-ceq'NORMAL_CLI_ROUTE_SCOPED_ABSENCE_CONFIRMED') 'Independent normal scoped absence required'
             $out.status='NORMAL_RETURNED_AND_SCOPED_ABSENCE';return $out

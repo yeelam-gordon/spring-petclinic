@@ -61,6 +61,7 @@ function CheckModel([string]$Case,[string]$HomeState='absent',[switch]$Aliases){
                 early-time{$live.created='not-a-time'}
                 early-reused{$live.created='2026-01-01T00:00:01Z'}
                 early-foreign{$live.executable='FOREIGN'}
+                early-owner-missing{$census.expectedIdentityGone=$true;$census.sameJdkJava=@();$census.knownLive=@()}
                 positive-offset{$live.created='2026-01-01T08:00:00.0000000+08:00';$tracked.created='2026-01-01T00:00:00.0000000Z'}
             }
             $census
@@ -110,7 +111,7 @@ $proof+=CheckModel 'positive-tar'
 $proof+=CheckModel 'positive-alias' -Aliases
 $proof+=CheckModel 'positive-offset'
 foreach($s in 'stock-fail','fidelity-fail','context-fail','stop-fail','pid-change','id-fail','registry-fail'){$proof+=CheckModel $s}
-foreach($s in 'early-hold','early-missing','early-schema','early-types','early-tracked','early-time','early-reused','early-foreign','early-hold-cleanup-fail','post-census-fail'){$proof+=CheckModel $s}
+foreach($s in 'early-hold','early-missing','early-schema','early-types','early-tracked','early-time','early-reused','early-foreign','early-owner-missing','early-hold-cleanup-fail','post-census-fail'){$proof+=CheckModel $s}
 $common=@{Project=$project;Jdk=$jdk;Owned=(Join-Path $OutputDirectory 'NOT_CREATED');WatchRoot=$RepositorySource}
 foreach($case in 'no-authority','real-callback','native-gate','owned-target','identity-pin'){
     $args=@{};foreach($p in $common.GetEnumerator()){$args[$p.Key]=$p.Value};$failure=$null

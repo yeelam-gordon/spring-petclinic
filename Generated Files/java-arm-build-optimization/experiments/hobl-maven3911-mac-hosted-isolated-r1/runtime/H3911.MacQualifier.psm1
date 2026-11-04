@@ -41,7 +41,7 @@ function Import-MQ {
         'H3911.Darwin103.psm1'=@('05F80C9435B3E6012FAE8874A887A7F96AF8B44311EC1D4A06265ED254E7A264',@('Assert-H3911Darwin103Distribution'))
         'H3911.StockMaven3911.psm1'=@('3D8DCF80AFF694FDC716122B2E76274BBB2D5FD7D882C7D04DC61DE5EF55911D',@('Assert-H3911StockMaven3911'))
         'H3911.EffectiveOwner.psm1'=@('4979E2E0160A6DCF9C7B13E279DA712F047634AABB7F3CB021C2A25578CF7B95',@('Read-H3911DarwinEffectiveOwner'))
-        'H3911.DarwinLifecycle.psm1'=@('AD420580D1F4E98350ADF94102BE43C96EEF9A5CC3086DC5C0F33DB493C5E66A',@('New-H3911DarwinPrivateStopPlan','Confirm-H3911DarwinCliStop','Read-H3911DarwinScopedCensus'))}
+        'H3911.DarwinLifecycle.psm1'=@('4825B8C82458934A503B181E9756C03934045B803AD482F7C8BF9230680316E2',@('New-H3911DarwinPrivateStopPlan','Confirm-H3911DarwinCliStop','Read-H3911DarwinScopedCensus'))}
     $bound=@{}
     foreach($row in $spec.GetEnumerator()){
         $path=Join-Path $PSScriptRoot $row.Key
@@ -99,7 +99,12 @@ function Assert-MQEarlyCensus($C,$Anchor,$Census,$Commands){
     }
     foreach($key in 'daemonId','home','registryFile','jniPath'){& ${function:Assert-MQ} ($Census.tracked[0][$key]-is[string]-and$Census.tracked[0][$key]-ceq$Anchor[$key]) 'Early tracked owner scope differs'}
     foreach($identity in $Census.sameJdkJava[0],$Census.knownLive[0]){& ${function:Assert-MQ} (& ($Commands['Test-LifeSame']) $Anchor $identity) 'Early live owner reused/foreign'}
-    @{status='COMPLETE_OWNED_RUNNING_SCOPE_CONFIRMED';complete=$true;scope=$scope;ownerPid=$Anchor.pid;trackedCount=$Census.tracked.Count;sameJdkCount=1;knownLiveCount=1;errors=0;ownerLive=$true;absenceAsserted=$false;afterCall='daemon-project';beforeCall='baseline-maven-home';fixtureOnly=$C.FixtureOnly}
+    $summary=@{status='COMPLETE_OWNED_RUNNING_SCOPE_CONFIRMED';complete=$true;scope=$scope;ownerPid=$Anchor.pid;trackedCount=$Census.tracked.Count;sameJdkCount=1;knownLiveCount=1;errors=0;ownerLive=$true;absenceAsserted=$false;afterCall='daemon-project';beforeCall='baseline-maven-home';fixtureOnly=$C.FixtureOnly}
+    if(-not$C.FixtureOnly){
+        & ${function:Assert-MQ} ($Census.observationBasis-is[string]-and$Census.observationBasis-ceq'INITIAL_PID_SET_VALIDATED_OR_ESRCH_RECHECK'-and$Census.initialPidSetCount-is[int]-and$Census.missingAtRecheckCount-is[int]-and$Census.presenceRecheckAttempts-is[int]-and$Census.missingAtRecheckCount-ge0-and$Census.presenceRecheckAttempts-ge$Census.missingAtRecheckCount-and$Census.presenceRecheckAttempts-le$Census.initialPidSetCount) 'Native initial-PID-set accounting missing'
+        foreach($field in 'initialPidSetCount','missingAtRecheckCount','presenceRecheckAttempts','observationBasis'){$summary[$field]=$Census[$field]}
+    }
+    $summary
 }
 function Stop-MQ($C,$Commands,$Anchor,$Hooks,[switch]$Emergency){
     if(-not$Emergency){$null=& ($Commands['Assert-H3911Source']) $C;if(-not$C.FixtureOnly){$null=& ($Commands['Assert-H3911Darwin103Distribution']) $C.Home -RequireNativeModes}}
@@ -188,6 +193,7 @@ function Invoke-H3911MacQualifier {
                 if($label-ceq'daemon-project'){
                     $record.earlyCensus=@{status='HOLD';afterCall=$label;beforeCall='baseline-maven-home';absenceAsserted=$false;fixtureOnly=[bool]$FixtureOnly}
                     $visibility=if($FixtureOnly){& $FixtureHooks.Census $c $anchor}else{& ($commands['Read-H3911DarwinScopedCensus']) -Context $c -Expected $anchor -RuntimeApproved}
+                    if(-not$FixtureOnly){foreach($field in 'initialPidSetCount','missingAtRecheckCount','presenceRecheckAttempts','observationBasis'){$record.earlyCensus[$field]=$visibility[$field]}}
                     $record.earlyCensus=& ${function:Assert-MQEarlyCensus} $c $anchor $visibility $commands
                 }
             }

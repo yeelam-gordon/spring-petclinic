@@ -63,23 +63,66 @@ function Confirm-H3911DarwinAbsenceFacts {
     Assert-DarwinLife ($Census.expectedIdentityGone-and$Census.sameJdkJava.Count-eq0-and$Census.knownLive.Count-eq0) 'Possible Java/known descendant survivor; empty registry/root exit is insufficient'
     @{status=$(if($StopExit-eq0-and-not$Forced-and-not$Emergency){'NORMAL_CLI_ROUTE_SCOPED_ABSENCE_CONFIRMED'}else{'FAIL_NONZERO_FORCED_OR_EMERGENCY'});runtimeAuthorized=$false;evidenceKind='validated-absence-model';scope=$Census.scope;universalHistoricalDescendantsAbsent=$false}
 }
+function ConvertTo-LifePresenceReason($Status,$Errno){
+    if($Status-isnot[int]-or$Errno-isnot[int]){return 'UNKNOWN'}
+    if($Status-eq0){return 'PRESENT'}
+    if($Status-eq-1-and$Errno-eq3){return 'MISSING_ESRCH'}
+    if($Status-eq-1-and$Errno-eq1){return 'PRESENT_EPERM'}
+    'UNKNOWN'
+}
+function Read-LifePresence([ValidateRange(1,2147483647)][int]$ProcessId,[switch]$RuntimeApproved){
+    if(-not$IsMacOS-or-not$RuntimeApproved){throw 'HOLD: native Mac approved signal0 presence only'}
+    $cached=Get-Variable -Name LifePresenceType -Scope Script -ErrorAction SilentlyContinue
+    if($cached-and($cached.Value-isnot[type]-or-not[object]::ReferenceEquals($cached.Value,('H3911.MacPresenceErrnoV1'-as[type])))){throw 'HOLD: native presence cache identity mismatch'}
+    if(-not$cached){
+        if('H3911.MacPresenceErrnoV1'-as[type]){throw 'HOLD: native presence type collision'}
+        $script:LifePresenceType=Add-Type -PassThru -ErrorAction Stop -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+namespace H3911 {
+    public static class MacPresenceErrnoV1 {
+        [DllImport("/usr/lib/libSystem.B.dylib", EntryPoint="kill", ExactSpelling=true, CallingConvention=CallingConvention.Cdecl, SetLastError=true)]
+        private static extern int Kill(int pid, int signal);
+        public static int[] Read(int pid) {
+            if (pid <= 0) throw new ArgumentOutOfRangeException(nameof(pid));
+            if (!OperatingSystem.IsMacOS()) throw new PlatformNotSupportedException();
+            int status = Kill(pid, 0);
+            int error = Marshal.GetLastPInvokeError();
+            return new int[] { status, error };
+        }
+    }
+}
+'@
+        if($script:LifePresenceType.FullName-cne'H3911.MacPresenceErrnoV1'){throw 'HOLD: native presence type origin unavailable'}
+    }
+    $facts=$script:LifePresenceType::Read($ProcessId)
+    & ${function:ConvertTo-LifePresenceReason} $facts[0] $facts[1]
+}
 function Get-LifeOsProcesses {
-    $rows=@()
+    param([switch]$RuntimeApproved)
+    if(-not$IsMacOS-or-not$RuntimeApproved){throw 'HOLD: native Mac approved census required'}
+    $rows=@();$rechecks=0;$missing=0
     try{$all=[Diagnostics.Process]::GetProcesses()}catch{throw 'HOLD: full native process enumeration failed [reason=CENSUS_ENUMERATION_FAILED;phase=enumerate;pid=unavailable;scanComplete=false]'}
     foreach($p in $all){
-        $phase='pid';$pidText='unavailable';$failed=$false
+        $phase='pid';$pidText='unavailable';$failed=$false;$missingConfirmed=$false;$presence='NOT_ATTEMPTED_INVALID_PID'
         try{
             $id=$p.Id;if($null-eq$id){throw 'Unavailable PID value'}
             if(($id-is[int]-or$id-is[long]-or$id-is[uint32])-and$id-gt0-and$id-le[int]::MaxValue){$pidText=$id.ToString([Globalization.CultureInfo]::InvariantCulture)}
             $phase='start-time';$created=$p.StartTime.ToUniversalTime().ToString('o')
             $phase='main-module';$module=$p.MainModule;if($null-eq$module){throw 'Unavailable module value'}
             $phase='module-file-name';$executable=$module.FileName;if($null-eq$executable){throw 'Unavailable executable value'}
-            $phase='identity';$rows+=,@{pid=$id;created=$created;executable=$executable};Assert-LifeIdentity $rows[-1]
+            $phase='identity';$row=@{pid=$id;created=$created;executable=$executable};Assert-LifeIdentity $row;$rows+=,$row
         }
-        catch{$failed=$true;throw ('HOLD: unreadable/exited/ambiguous native process identity during full census [reason=CENSUS_ROW_FAILED;phase='+$phase+';pid='+$pidText+';scanComplete=false]')}
-        finally{try{$p.Dispose()}catch{if(-not$failed){throw ('HOLD: native process disposal failed [reason=CENSUS_DISPOSE_FAILED;phase=dispose;pid='+$pidText+';scanComplete=false]')}}}
+        catch{
+            $failed=$true
+            if($pidText-cne'unavailable'){$rechecks++;try{$presence=& ${function:Read-LifePresence} -ProcessId ([int]$id) -RuntimeApproved:$RuntimeApproved}catch{$presence='UNKNOWN'}}
+            $missingConfirmed=$presence-is[string]-and$presence-ceq'MISSING_ESRCH'
+            if(-not$missingConfirmed){throw ('HOLD: unreadable/exited/ambiguous native process identity during full census [reason=CENSUS_ROW_FAILED;phase='+$phase+';pid='+$pidText+';scanComplete=false] [presence='+$presence+';missingAtRecheck='+$missing+';presenceAttempts='+$rechecks+']')}
+        }
+        finally{try{$p.Dispose()}catch{if($missingConfirmed){throw ('HOLD: census read and disposal failed [reason=CENSUS_ROW_FAILED;phase='+$phase+';pid='+$pidText+';scanComplete=false] [presence=MISSING_ESRCH;dispose=failed;missingAtRecheck='+$missing+';presenceAttempts='+$rechecks+']')};if(-not$failed){throw ('HOLD: native process disposal failed [reason=CENSUS_DISPOSE_FAILED;phase=dispose;pid='+$pidText+';scanComplete=false] [missingAtRecheck='+$missing+';presenceAttempts='+$rechecks+']')}}}
+        if($missingConfirmed){$missing++}
     }
-    @{complete=$true;errors=@();processes=$rows}
+    @{complete=$true;errors=@();processes=$rows;initialPidSetCount=$all.Count;missingAtRecheckCount=$missing;presenceRecheckAttempts=$rechecks;observationBasis='INITIAL_PID_SET_VALIDATED_OR_ESRCH_RECHECK'}
 }
 function Get-LifeCurrent([int]$ProcessId){
     $pidText=if($ProcessId-gt0){$ProcessId.ToString([Globalization.CultureInfo]::InvariantCulture)}else{'unavailable'}
@@ -122,7 +165,10 @@ function Read-H3911DarwinScopedCensus {
     Assert-DarwinLife ($Expected.evidenceKind-is[string]-and$Expected.evidenceKind-ceq'native-mac-effective-owner') 'Prior native effective-owner evidence required'
     $osReader=$ExecutionContext.SessionState.InvokeCommand.GetCommand('Get-LifeOsProcesses',[Management.Automation.CommandTypes]::Function)
     Assert-DarwinLife ([string]::Equals($osReader.Module.Path,$ExecutionContext.SessionState.Module.Path,[StringComparison]::Ordinal)) 'Native OS census command origin differs'
-    $result=& ($ExecutionContext.SessionState.Module.ExportedCommands['ConvertTo-H3911DarwinScopedCensus']) $Context $Expected (& $osReader)
+    $observation=& $osReader -RuntimeApproved
+    Assert-DarwinLife ($observation.initialPidSetCount-is[int]-and$observation.missingAtRecheckCount-is[int]-and$observation.presenceRecheckAttempts-is[int]-and$observation.missingAtRecheckCount-ge0-and$observation.presenceRecheckAttempts-ge$observation.missingAtRecheckCount-and$observation.presenceRecheckAttempts-le$observation.initialPidSetCount-and$observation.processes.Count+$observation.missingAtRecheckCount-eq$observation.initialPidSetCount) 'Native snapshot accounting incomplete'
+    $result=& ($ExecutionContext.SessionState.Module.ExportedCommands['ConvertTo-H3911DarwinScopedCensus']) $Context $Expected $observation
+    foreach($field in 'initialPidSetCount','missingAtRecheckCount','presenceRecheckAttempts','observationBasis'){$result[$field]=$observation[$field]}
     $result.evidenceKind='native-mac-scoped-census';$result
 }
 function New-H3911DarwinPrivateStopPlan {
@@ -148,8 +194,10 @@ function Confirm-H3911DarwinCliStop {
     Assert-DarwinLife ([string]::Equals($registryReader.Module.Path,$ExecutionContext.SessionState.Module.Path,[StringComparison]::Ordinal)) 'Native registry command origin differs'
     $snapshot=& $registryReader $Context
     $census=& ($ExecutionContext.SessionState.Module.ExportedCommands['Read-H3911DarwinScopedCensus']) $Context $Expected -RuntimeApproved
-    $result=& ($ExecutionContext.SessionState.Module.ExportedCommands['Confirm-H3911DarwinAbsenceFacts']) $Context $Expected $snapshot.registry $census $StopExit -Forced:$Forced -Emergency:$Emergency
+    try{$result=& ($ExecutionContext.SessionState.Module.ExportedCommands['Confirm-H3911DarwinAbsenceFacts']) $Context $Expected $snapshot.registry $census $StopExit -Forced:$Forced -Emergency:$Emergency}
+    catch{throw ($_.ToString()+' [observationBasis=INITIAL_PID_SET_VALIDATED_OR_ESRCH_RECHECK;missingAtRecheck='+$census.missingAtRecheckCount+';presenceAttempts='+$census.presenceRecheckAttempts+']')}
     Assert-DarwinLife ([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([IO.File]::ReadAllBytes($Context.Registry+'/registry.bin')))-ceq$snapshot.digest) 'Registry changed during absence census'
+    foreach($field in 'initialPidSetCount','missingAtRecheckCount','presenceRecheckAttempts','observationBasis'){$result[$field]=$census[$field]}
     $result.evidenceKind='native-scoped-absence-result';$result
 }
 Export-ModuleMember -Function New-H3911DarwinStopPlanFacts,ConvertTo-H3911DarwinScopedCensus,Confirm-H3911DarwinAbsenceFacts,Read-H3911DarwinScopedCensus,New-H3911DarwinPrivateStopPlan,Confirm-H3911DarwinCliStop
