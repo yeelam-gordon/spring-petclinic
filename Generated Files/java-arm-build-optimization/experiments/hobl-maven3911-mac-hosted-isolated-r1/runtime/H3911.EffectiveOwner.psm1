@@ -72,7 +72,7 @@ function Assert-H3911EffectiveOwnerFacts {
 function Resolve-EffectivePhysical([string]$Path,[switch]$Directory){
     Assert-EffectivePath $Path
     $resolved=Resolve-Path -LiteralPath $Path -ErrorAction Stop;$item=Get-Item -LiteralPath $resolved.ProviderPath -Force
-    Assert-EffectiveOwner ($resolved.Provider.Name-ceq'FileSystem'-and[string]::Equals($resolved.ProviderPath,$Path,[StringComparison]::Ordinal)-and($Directory-and$item-is[IO.DirectoryInfo]-or-not$Directory-and$item-is[IO.FileInfo])-and-not($item.Attributes-band[IO.FileAttributes]::ReparsePoint)-and($Directory-or-not$item.LinkType)) 'Noncanonical/linked physical owner path'
+    Assert-EffectiveOwner ($resolved.Provider.Name-ceq'FileSystem'-and[string]::Equals($resolved.ProviderPath,$Path,[StringComparison]::Ordinal)-and(($Directory-and$item-is[IO.DirectoryInfo])-or((-not$Directory)-and$item-is[IO.FileInfo]))-and-not($item.Attributes-band[IO.FileAttributes]::ReparsePoint)-and($Directory-or-not$item.LinkType)) 'Noncanonical/linked physical owner path'
     $parent=if($Directory){$item}else{$item.Directory}
     while($parent){Assert-EffectiveOwner (-not((Get-Item -LiteralPath $parent.FullName -Force).Attributes-band[IO.FileAttributes]::ReparsePoint)) 'Linked owner ancestry';$parent=$parent.Parent}
     $resolved.ProviderPath

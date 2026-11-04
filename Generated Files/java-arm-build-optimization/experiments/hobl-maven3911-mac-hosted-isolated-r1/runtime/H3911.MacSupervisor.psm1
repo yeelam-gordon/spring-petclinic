@@ -8,7 +8,7 @@ function Read-SupJson([string]$Path){
 }
 function Assert-SupBase {
     $manifest=Join-Path $PSScriptRoot 'mac-qualifier-sha256.json'
-    & ${function:Assert-Sup} ((Microsoft.PowerShell.Utility\Get-FileHash $manifest).Hash-ceq'FDDBD680E4708F0321EEFF5B969EC9F3DAF5AD3D240477219EDA3EA975E2E06F') 'Frozen Mac source manifest differs'
+    & ${function:Assert-Sup} ((Microsoft.PowerShell.Utility\Get-FileHash $manifest).Hash-ceq'C9ADBB465E5AD9C2AAB6144366C132142551A5F2115FA4E7DEE870E0616C4ABA') 'Frozen Mac source manifest differs'
     $rows=Get-Content $manifest -Raw|ConvertFrom-Json -AsHashtable -DateKind String
     & ${function:Assert-Sup} ($rows-is[array]-and$rows.Count-eq18) 'Exact frozen source closure required'
     foreach($row in $rows){& ${function:Assert-Sup} ($row.file-is[string]-and$row.file-notmatch'[/\\:]|^\.'-and(Microsoft.PowerShell.Utility\Get-FileHash (Join-Path $PSScriptRoot $row.file)).Hash-ceq$row.sha256) 'Frozen Mac payload differs'}
@@ -69,7 +69,7 @@ function Invoke-SupNativeCleanup($R){
             $out.status='NORMAL_RETURNED_AND_SCOPED_ABSENCE';return $out
         }
         & ${function:Assert-Sup} ($reg.count-eq1) 'Failure cleanup requires one complete registry owner; absent anchor remains HOLD'
-        $reader=& ${function:Get-SupCommand} 'H3911.EffectiveOwner.psm1' 'Read-H3911DarwinEffectiveOwner' 'AA208B30F94342541C741E60A94F84A94E3DA3CC0F8C5D236EAC9D4A34267397'
+        $reader=& ${function:Get-SupCommand} 'H3911.EffectiveOwner.psm1' 'Read-H3911DarwinEffectiveOwner' '4979E2E0160A6DCF9C7B13E279DA712F047634AABB7F3CB021C2A25578CF7B95'
         $out.parentEffectiveOwnerReads=1
         $owner=& $reader -Context $c -RuntimeApproved
         $census=& $censusCmd -Context $c -Expected $owner -RuntimeApproved

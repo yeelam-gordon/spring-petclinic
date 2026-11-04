@@ -78,7 +78,6 @@ jobs:
             try{
               $response=Invoke-WebRequest -Uri $inputSpec.url -OutFile $archive -PassThru -MaximumRetryCount 0 -MaximumRedirection 5
               $receipt.actualSha256=(Get-FileHash $archive).Hash;$receipt.bytes=(Get-Item $archive).Length
-              $receipt.observedFinalUrl=[string]$response.BaseResponse.RequestMessage.RequestUri
               if($receipt.actualSha256-cne$inputSpec.sha256){throw 'Actual archive digest differs'}
               $receipt.status='ACTUAL_BYTES_SHA256_VERIFIED'
             }catch{$receipt.status='FAIL';$receipt.errorKind=$_.FullyQualifiedErrorId;throw}

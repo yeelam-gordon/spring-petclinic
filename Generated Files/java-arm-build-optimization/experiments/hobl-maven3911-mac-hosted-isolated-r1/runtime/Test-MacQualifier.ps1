@@ -2,12 +2,41 @@ param([Parameter(Mandatory)][string]$RepositorySource,[Parameter(Mandatory)][str
 $ErrorActionPreference='Stop';$PSNativeCommandUseErrorActionPreference=$false
 if(-not[IO.Path]::IsPathFullyQualified($OutputDirectory)-or(Test-Path $OutputDirectory)){throw 'Fresh absolute model output required'}
 New-Item $OutputDirectory -ItemType Directory|Out-Null
+$guardRoot=Join-Path $OutputDirectory 'physical guard with spaces';New-Item $guardRoot -ItemType Directory|Out-Null
+$guardFile=Join-Path $guardRoot 'ordinary file.txt';[IO.File]::WriteAllText($guardFile,'HARMLESS_PHYSICAL_GUARD_ONLY')
+$tokens=$null;$errors=$null;$ownerAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'H3911.EffectiveOwner.psm1'),[ref]$tokens,[ref]$errors)
+$guard=$ownerAst.Find({param($n)$n-is[Management.Automation.Language.CommandAst]-and$n.GetCommandName()-ceq'Assert-EffectiveOwner'-and$n.Extent.Text.Contains('$resolved.Provider.Name')},$true)
+$physicalCondition=[scriptblock]::Create('param($Path,$Directory,$resolved,$item) '+$guard.CommandElements[1].Extent.Text)
+$physicalProof=@()
+foreach($sample in @(@($guardRoot,$true,$true),@($guardFile,$false,$true),@($guardRoot,$false,$false),@($guardFile,$true,$false))){
+    $item=Get-Item -LiteralPath $sample[0] -Force;$resolved=Resolve-Path -LiteralPath $sample[0]
+    $accepted=& $physicalCondition $sample[0] ([Management.Automation.SwitchParameter]::new([bool]$sample[1])) $resolved $item
+    if([bool]$accepted-ne[bool]$sample[2]){throw 'Actual source physical directory/file guard regression'}
+    $physicalProof+=@{case='actual-kind';expectedDirectory=$sample[1];accepted=[bool]$accepted;passed=$true}
+}
+$item=Get-Item $guardFile;$resolved=Resolve-Path $guardFile
+foreach($kind in 'provider','ordinal','false-valuetype'){
+    $r=$resolved;$obj=$item
+    switch($kind){provider{$r=[pscustomobject]@{ProviderPath=$guardFile;Provider=[pscustomobject]@{Name='Registry'}}}ordinal{$r=[pscustomobject]@{ProviderPath=($guardFile+'DIFFERENT');Provider=$resolved.Provider}}false-valuetype{$obj=$false}}
+    if(& $physicalCondition $guardFile ([Management.Automation.SwitchParameter]::new($false)) $r $obj){throw 'Actual physical guard policy was relaxed'}
+    $physicalProof+=@{case=$kind;passed=$true}
+}
+$fileLink=Join-Path $OutputDirectory 'physical-file-link';New-Item -ItemType SymbolicLink -Path $fileLink -Target $guardFile|Out-Null
+if(& $physicalCondition $fileLink ([Management.Automation.SwitchParameter]::new($false)) (Resolve-Path $fileLink) (Get-Item $fileLink -Force)){throw 'Actual physical link guard was relaxed'}
+$physicalProof+=@{case='actual-link-reparse';passed=$true}
+$dirLink=Join-Path $OutputDirectory 'physical-directory-link';New-Item -ItemType SymbolicLink -Path $dirLink -Target $guardRoot|Out-Null
+$ancestryGuard=$ownerAst.Find({param($n)$n-is[Management.Automation.Language.CommandAst]-and$n.GetCommandName()-ceq'Assert-EffectiveOwner'-and$n.Extent.Text.Contains("'Linked owner ancestry'")},$true)
+$ancestryCondition=[scriptblock]::Create('param($parent) '+$ancestryGuard.CommandElements[1].Extent.Text)
+if(& $ancestryCondition (Get-Item $dirLink -Force)){throw 'Actual physical ancestry guard was relaxed'}
+$physicalProof+=@{case='actual-linked-ancestry';passed=$true}
+$physicalProof|ConvertTo-Json -Depth 4|Set-Content (Join-Path $OutputDirectory 'physical-guard-proof.json')
 $git=(Get-Command git -CommandType Application|Select-Object -First 1).Source;$project=Join-Path $OutputDirectory 'project'
 & $git clone --quiet --no-checkout --no-hardlinks $RepositorySource $project;if($LASTEXITCODE){throw 'Model clone failed'}
 foreach($a in @(@('config','core.autocrlf','false'),@('remote','set-url','origin','https://github.com/spring-projects/spring-petclinic.git'),@('checkout','--quiet','--detach','6feeae0f13e0e258eedc99832416b42bb13779b1'))){& $git -C $project @a;if($LASTEXITCODE){throw 'Model source admission setup failed'}}
 $jdk=Join-Path $OutputDirectory 'SYNTHETIC-JDK';New-Item $jdk -ItemType Directory|Out-Null
 $module=Import-Module (Join-Path $PSScriptRoot 'H3911.MacQualifier.psm1') -Scope Local -PassThru -Force -DisableNameChecking
 $invoke=$module.ExportedCommands['Invoke-H3911MacQualifier'];$proof=@()
+$proof+=@{case='actual-source-physical-guard';passed=$true;controls=$physicalProof.Count;scope='Actual guard AST/real ordinary filesystem objects; no Owner hook or MacOS spoof'}
 function CheckModel([string]$Case,[string]$HomeState='absent',[switch]$Aliases){
     $owned=Join-Path $OutputDirectory $Case;$state=@{alive=$false;stops=0;reads=0;case=$Case}
     $hooks=@{
