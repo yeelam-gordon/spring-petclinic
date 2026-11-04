@@ -1,0 +1,1554 @@
+{
+  "schema": "trusted-stock-maven3911-v1",
+  "distribution": "apache-maven-3.9.11",
+  "root": "apache-maven-3.9.11",
+  "core": {
+    "path": "lib/maven-core-3.9.11.jar",
+    "sha256": "93D3C0523DDA6C86C6620D9E692E7DF39D0E2E4E4CD860061A8C0D274C2AD185"
+  },
+  "source": {
+    "petclinicCommit": "6feeae0f13e0e258eedc99832416b42bb13779b1",
+    "propertiesSha256": "8F2A4438810348270D9D98F8D6D530541DDB7271E373DB207E8AC381E0E35B62",
+    "distributionUrl": "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.11/apache-maven-3.9.11-bin.zip",
+    "windowsCacheKey": "03d7e36a140982eea48e22c1dcac01d8862b2550b2939e09a0809bbc5182a5bc",
+    "macCacheKey": "a2d47e15",
+    "macTarFallback": "URL rewritten after cache key is computed; mvnw.url stores actual zip/tar URL plus LF",
+    "signatureVerification": "Detached asc retained; not keyring verified"
+  },
+  "formats": {
+    "Zip": {
+      "archive": "apache-maven-3.9.11-bin.zip",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.11/apache-maven-3.9.11-bin.zip",
+      "sha256": "0D7125E8C91097B36EDB990EA5934E6C68B4440EEF4EA96510A0F6815E7EEADB",
+      "sha512": "03e2d65d4483a3396980629f260e25cac0d8b6f7f2791e4dc20bc83f9514db8d0f05b0479e699a5f34679250c49c8e52e961262ded468a20de0be254d8207076",
+      "files": [
+        {
+          "path": "LICENSE",
+          "bytes": 8389,
+          "sha256": "34AD6C700586294F56B50A7CF7120D5F031A6F68099D86C7DE6E860DBE8523AD",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "NOTICE",
+          "bytes": 4854,
+          "sha256": "9739DD84556B9458E60C049A24F4C78F3146B0D57CDDAF5B4FBFB2F71DA259EB",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "README.txt",
+          "bytes": 1279,
+          "sha256": "50204858C8F92F428B6BDE8D420CD96BEBAF23622A68AFCFCF95310487D30C35",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "bin/m2.conf",
+          "bytes": 327,
+          "sha256": "E336769BF93A902BAA7A3E827BA55E4CEF7DE4AF2ED1A9541A4261094D748BA9",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "bin/mvn",
+          "bytes": 6184,
+          "sha256": "F9381D0CB98ABAAF9592DAE421EDDC497E84ED9BFB723B84C111D1350863C3A2",
+          "mode": 493,
+          "archiveMode": 493
+        },
+        {
+          "path": "bin/mvn.cmd",
+          "bytes": 6778,
+          "sha256": "F89D866139ADD674690BBA0702A0CC4F9769276362C4DA01F96267AB85F6487E",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "bin/mvnDebug",
+          "bytes": 1684,
+          "sha256": "830C2F6E8D55943EADDB7EAFAE0C38ED2651FF933B2CA7B7F8FE3740DDEBBC59",
+          "mode": 493,
+          "archiveMode": 493
+        },
+        {
+          "path": "bin/mvnDebug.cmd",
+          "bytes": 2169,
+          "sha256": "79E8229561F808F2BE594F7D3BE9D509DC06BBA2B70C87421B58F252C1C79C06",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "bin/mvnyjp",
+          "bytes": 1611,
+          "sha256": "C82CA8E4DA8C343C0FEE8E7895034F015458BA4903C6129B7FD5A9EF4A60E8E3",
+          "mode": 493,
+          "archiveMode": 493
+        },
+        {
+          "path": "boot/plexus-classworlds-2.9.0.jar",
+          "bytes": 54086,
+          "sha256": "1AD3292CD563381E3FD632F3FDED1988F9E9B2BE7A9F3DB63FF4C4CEDBA13FA5",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "boot/plexus-classworlds.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "conf/logging/simplelogger.properties",
+          "bytes": 1338,
+          "sha256": "42140F6EC135827BEC255A2EBDFA11211387402D13296792FF40E56A96CEDDF8",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "conf/settings.xml",
+          "bytes": 10528,
+          "sha256": "2F552325AEDD9A9C9268DF520BE22CFE3AA86260B76A0F830D2796D2F0E22BD4",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "conf/toolchains.xml",
+          "bytes": 3645,
+          "sha256": "716A6E73E4B0131A72C7329CF7A9CBFB75AFC3042ED732CD1862BDFCD89C1311",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/aopalliance-1.0.jar",
+          "bytes": 4467,
+          "sha256": "0ADDEC670FEDCD3F113C5C8091D783280D23F75E3ACB841B61A9CDB079376A08",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/aopalliance.license",
+          "bytes": 13,
+          "sha256": "F6960BE1B71D602352D7D9DE76A564F54F3DAB550B23FA5674049F842116CA55",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/asm-9.8.jar",
+          "bytes": 126113,
+          "sha256": "876EAB6A83DAECAD5CA67EB9FCABB063C97B5AEB8CF1FCA7A989ECDE17522051",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/asm.license",
+          "bytes": 1626,
+          "sha256": "8C920015A749851EDEA93F71116D45DCD6BEEFA6069B6BAF526C0ADCAF26979C",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/commons-cli-1.9.0.jar",
+          "bytes": 75479,
+          "sha256": "D3D530D0F28FD0FBBFFE2B0B338F70E8CB96F1605579E2E3ABD4DB29CAC24E69",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/commons-cli.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/commons-codec-1.18.0.jar",
+          "bytes": 373045,
+          "sha256": "BA005F304CEF92A3DEDE24A38AD5AC9B8AFCCF0D8F75839D6C1338634CF7F6E4",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/commons-codec.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/error_prone_annotations-2.38.0.jar",
+          "bytes": 20389,
+          "sha256": "6661D5335090A5FC61DD869D2095BC6C1E2156E3AA47A6E4ABABDF64C99A7889",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/error_prone_annotations.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/ext/README.txt",
+          "bytes": 143,
+          "sha256": "E37E36D87F66A9C1CC131519BD18FB5E89318F42C58589096EA539FA8E411F6F",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/ext/hazelcast/README.txt",
+          "bytes": 300,
+          "sha256": "9AF1E954AA54AD0CE9FFA1677DE9D82F45EB8FB0B0F1EB84907DC7552DEE9565",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/ext/redisson/README.txt",
+          "bytes": 295,
+          "sha256": "407F3240C5C288422C714440C8B79B5B5125225B368BE45CB832E418E39CF255",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/failureaccess-1.0.3.jar",
+          "bytes": 10763,
+          "sha256": "CBFC3906B19B8F55DD7CFD6DFE0AA4532E834250D7F080BD8D211A3E246B59CB",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/failureaccess.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/gson-2.13.1.jar",
+          "bytes": 286972,
+          "sha256": "94855942D4992F112946D3DE1C334E709237B8126D8130BF07807C018A4A2120",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/gson.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/guava-33.4.8-jre.jar",
+          "bytes": 3023797,
+          "sha256": "F3D7F57F67FD622F4D468DFDD692B3A5E3909246C28017AC3263405F0FE617ED",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/guava.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/guice-5.1.0-classes.jar",
+          "bytes": 656919,
+          "sha256": "142AD4475E19524D2FE3AC995B3F7CBC962FC726F2EDB9DBDCCC61FEAB9B2BF9",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/guice.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/httpclient-4.5.14.jar",
+          "bytes": 785639,
+          "sha256": "C8BC7E1C51A6D4CE72F40D2EBBABF1C4B68BFE76E732104B04381B493478E9D6",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/httpclient.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/httpcore-4.4.16.jar",
+          "bytes": 327891,
+          "sha256": "6C9B3DD142A09DC468E23AD39AAD6F75A0F2B85125104469F026E52A474E464F",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/httpcore.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/jansi-2.4.2.jar",
+          "bytes": 256537,
+          "sha256": "0B7B8B003A90EA491579B62F5118828E45112914C65589B00FAA49D6EC785839",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/jansi-native/README.txt",
+          "bytes": 490,
+          "sha256": "068181E1D2E6BDC495C1C389BD74EB8932D3DA992731D8C630847486C0D7EC02",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/jansi-native/Windows/arm64/jansi.dll",
+          "bytes": 81408,
+          "sha256": "470E6DFC44B28D628E404D5D6BFBB14728C7973E2397D9149430C85171389A19",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/jansi-native/Windows/x86/jansi.dll",
+          "bytes": 115972,
+          "sha256": "9E6409C3264A6F33F5F97C58265C06E95BF91A896E8E179EBAEB8204C5D19ED3",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/jansi-native/Windows/x86_64/jansi.dll",
+          "bytes": 130522,
+          "sha256": "7020260C8DB5116042315EA73714AC36AD94ACDC330852280E889212506085C0",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/jansi.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/javax.annotation-api-1.3.2.jar",
+          "bytes": 26586,
+          "sha256": "E04BA5195BCD555DC95650F7CC614D151E4BCD52D29A10B8AA2197F3AB89AB9B",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/javax.annotation-api.license",
+          "bytes": 39395,
+          "sha256": "1B087AD282CB3CD0A11E4E160318EAB4FF0995AAE7D22E6AC0D30367E196C6E3",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/javax.inject-1.jar",
+          "bytes": 2497,
+          "sha256": "91C77044A50C481636C32D916FD89C9118A72195390452C81065080F957DE7FF",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/javax.inject.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/jcl-over-slf4j-1.7.36.jar",
+          "bytes": 16555,
+          "sha256": "AB57CA8FD223772C17365D121F59E94ECBF0AE59D08C03A3CB5B81071C019195",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/jcl-over-slf4j.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/jspecify-1.0.0.jar",
+          "bytes": 3819,
+          "sha256": "1FAD6E6BE7557781E4D33729D49AE1CDC8FDDA6FE477BB0CC68CE351EAFDFBAB",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/jspecify.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-artifact-3.9.11.jar",
+          "bytes": 58821,
+          "sha256": "0BFD1C121F907642344311D81E4DFD93EBA6C24DC712CC0AEAE273EB22833022",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-builder-support-3.9.11.jar",
+          "bytes": 14351,
+          "sha256": "5B1DE1560EC19C4C69A655F986455888F3A0BCC3C160CAC1F1EDB87DE3825F77",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-compat-3.9.11.jar",
+          "bytes": 288160,
+          "sha256": "B0E2865FC808FD9FB3BEE95BF37C0609EEB20C59BF1E6B958B37B365EE11F52E",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-core-3.9.11.jar",
+          "bytes": 713140,
+          "sha256": "93D3C0523DDA6C86C6620D9E692E7DF39D0E2E4E4CD860061A8C0D274C2AD185",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-embedder-3.9.11.jar",
+          "bytes": 117172,
+          "sha256": "7E15E05035331D0A7E0FE56D7354B2B30E15C0A8C60863CBF28DF25190E197DB",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-model-3.9.11.jar",
+          "bytes": 217939,
+          "sha256": "163AA596F976264384EFEB50B4CB8A806086FD64A9B755AD1F69195FED3998AD",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-model-builder-3.9.11.jar",
+          "bytes": 208642,
+          "sha256": "C4C72ACCDCD848332C1A37995610A6A369D49FDAABC43E85F0022A5B77DE3BA7",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-plugin-api-3.9.11.jar",
+          "bytes": 47119,
+          "sha256": "8E985A56412564CF687040EFED8BCD3A63EAC2202A824BB01E1D5ECE2B87458F",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-repository-metadata-3.9.11.jar",
+          "bytes": 28530,
+          "sha256": "F8655F5F0060E0032944F2A23688D186E140D2184749BCFA1927F83CD6A8B1A2",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-resolver-api-1.9.24.jar",
+          "bytes": 157239,
+          "sha256": "C0CE14849298720DCF3B09FE9E263B3C576D2D6CD43C61F8AA9D6117E04E5E47",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-resolver-connector-basic-1.9.24.jar",
+          "bytes": 40355,
+          "sha256": "18B7D557C41379DB8B157BA95263C676F52C293F5416B67BD1DB083E99B30383",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-resolver-impl-1.9.24.jar",
+          "bytes": 320116,
+          "sha256": "3CD88EDDA00C46242CDBE57AEFB47703519D176D9E8A500333DE15FAF41B0E1D",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-resolver-named-locks-1.9.24.jar",
+          "bytes": 37937,
+          "sha256": "A222B0A5CA4C145E8E0F45207A23BCCE18BDBE1F1C980E4E9FB332591EE8C91A",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-resolver-provider-3.9.11.jar",
+          "bytes": 79012,
+          "sha256": "B5D6E52AE1ECF1CB62EDE2234234BA3093149524066488E84415187CE478C582",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-resolver-spi-1.9.24.jar",
+          "bytes": 51655,
+          "sha256": "E3153906E93333C106EE18BABB72BA7984CCB15E9116EA08F88C71B8D9387E01",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-resolver-transport-file-1.9.24.jar",
+          "bytes": 16213,
+          "sha256": "B09268D41E1DFCAE15A829D45A512CA29D62B727421D3BD6383AC6252E5E960F",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-resolver-transport-http-1.9.24.jar",
+          "bytes": 62893,
+          "sha256": "A0DE339A8DD3473D9ABAA1CF974507F38783E26AF31D36A90C1E59CC8714DED0",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-resolver-transport-wagon-1.9.24.jar",
+          "bytes": 32466,
+          "sha256": "78ED57FA2123A2D84FAD7A0B15CA73B89DF47C10294D02D6F8121C4D0E5050CB",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-resolver-util-1.9.24.jar",
+          "bytes": 195913,
+          "sha256": "AEB7E776A8C47B1C317A2581F299E2525B044CB8ABDE31164E970BBBEFAB12B1",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-settings-3.9.11.jar",
+          "bytes": 44672,
+          "sha256": "026718D47D19E360D978857BC63D3DC065884FC2C801563D8A2A77B5AB74CCF8",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-settings-builder-3.9.11.jar",
+          "bytes": 42356,
+          "sha256": "33C96E4CA5A15B7C93180F6B2F8DEB15F511DFC15DDA0D2B671C968B22108972",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-shared-utils-3.4.2.jar",
+          "bytes": 151103,
+          "sha256": "B613357E1BAD4DFC1DEAD801691C9460F9585FE7C6B466BC25186212D7D18487",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/maven-slf4j-provider-3.9.11.jar",
+          "bytes": 23672,
+          "sha256": "76D9FA894FA61D1492877CA599CB5AB28CA4573D5F389D6C12A8233B995335F9",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/org.eclipse.sisu.inject-0.9.0.M4.jar",
+          "bytes": 305040,
+          "sha256": "1CBD7A965A5E2A9EA823BAB311962A4E5AA5C240705BDBAD5A52B40FFDFA1004",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/org.eclipse.sisu.inject.license",
+          "bytes": 14196,
+          "sha256": "209FE24BF55677BBF81C2B0481C1403201FAB57B3B4C609971EBA4EC8162B99C",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/org.eclipse.sisu.plexus-0.9.0.M4.jar",
+          "bytes": 215833,
+          "sha256": "B90579BC652EAC7331436E0A25533FCE14130B9C6E015F2DD3A3D4BB07E942B7",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/org.eclipse.sisu.plexus.license",
+          "bytes": 14196,
+          "sha256": "209FE24BF55677BBF81C2B0481C1403201FAB57B3B4C609971EBA4EC8162B99C",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/plexus-cipher-2.0.jar",
+          "bytes": 13003,
+          "sha256": "9A7F1B5C5A9EFFD61EADFD8731452A2F76A8E79111FAC391EF75EA801BEA203A",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/plexus-cipher.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/plexus-component-annotations-2.2.0.jar",
+          "bytes": 4151,
+          "sha256": "50EDB93C73786E62822B4FE1336E22880FDF147191373CF5C911370E16748FCF",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/plexus-component-annotations.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/plexus-interpolation-1.28.jar",
+          "bytes": 87143,
+          "sha256": "AB2A8715570438A2E4164D85AD3E8D489EABC38EA5093C2EB8AB7F58403535B5",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/plexus-interpolation.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/plexus-sec-dispatcher-2.0.jar",
+          "bytes": 23604,
+          "sha256": "873139960C4C780176DDA580B003A2C4BF82188BDCE5BB99234E224EF7ACFCEB",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/plexus-sec-dispatcher.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/plexus-utils-3.6.0.jar",
+          "bytes": 271773,
+          "sha256": "27EF130E32C236090E408FB5498D94CB9EA26D14070FB1C8985D607B62D098D1",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/plexus-utils.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/slf4j-api-1.7.36.jar",
+          "bytes": 41125,
+          "sha256": "D3EF575E3E4979678DC01BF1DCCE51021493B4D11FB7F1BE8AD982877C16A1C0",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/slf4j-api.license",
+          "bytes": 1154,
+          "sha256": "6FBE2EAF44B193B8A40EED9208F52848572224AD8D7672DD09418AA174847E73",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/wagon-file-3.5.3.jar",
+          "bytes": 11350,
+          "sha256": "AFC9216FA97B78DAD227B4A8D4D67B9897BF113A57F80598D62993841113E103",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/wagon-http-3.5.3.jar",
+          "bytes": 9405,
+          "sha256": "D2B6E48C9FCBE579E1858C622D14464011FF265FA6E28E794004A6882154A509",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/wagon-http-shared-3.5.3.jar",
+          "bytes": 40832,
+          "sha256": "8E7DA766F55164FDE8779AAAA125832506C2848CAB4876B5305138873E28037F",
+          "mode": 420,
+          "archiveMode": 420
+        },
+        {
+          "path": "lib/wagon-provider-api-3.5.3.jar",
+          "bytes": 55101,
+          "sha256": "5E72000338945ED3E96F8E4F578D1D0672E1AF7E19C0E9014197AE5B31AF3EF4",
+          "mode": 420,
+          "archiveMode": 420
+        }
+      ],
+      "directories": [
+        {
+          "path": "bin",
+          "mode": 493,
+          "archiveMode": 493
+        },
+        {
+          "path": "boot",
+          "mode": 493,
+          "archiveMode": 493
+        },
+        {
+          "path": "conf",
+          "mode": 493,
+          "archiveMode": 493
+        },
+        {
+          "path": "conf/logging",
+          "mode": 493,
+          "archiveMode": 493
+        },
+        {
+          "path": "lib",
+          "mode": 493,
+          "archiveMode": 493
+        },
+        {
+          "path": "lib/ext",
+          "mode": 493,
+          "archiveMode": 493
+        },
+        {
+          "path": "lib/ext/hazelcast",
+          "mode": 493,
+          "archiveMode": 493
+        },
+        {
+          "path": "lib/ext/redisson",
+          "mode": 493,
+          "archiveMode": 493
+        },
+        {
+          "path": "lib/jansi-native",
+          "mode": 493,
+          "archiveMode": 493
+        },
+        {
+          "path": "lib/jansi-native/Windows",
+          "mode": 493,
+          "archiveMode": 493
+        },
+        {
+          "path": "lib/jansi-native/Windows/arm64",
+          "mode": 493,
+          "archiveMode": 493
+        },
+        {
+          "path": "lib/jansi-native/Windows/x86",
+          "mode": 493,
+          "archiveMode": 493
+        },
+        {
+          "path": "lib/jansi-native/Windows/x86_64",
+          "mode": 493,
+          "archiveMode": 493
+        }
+      ],
+      "explicitRepeatedDirectoryRecords": [],
+      "physicalDirectories": [
+        "bin",
+        "boot",
+        "conf",
+        "conf/logging",
+        "lib",
+        "lib/ext",
+        "lib/ext/hazelcast",
+        "lib/ext/redisson",
+        "lib/jansi-native",
+        "lib/jansi-native/Windows",
+        "lib/jansi-native/Windows/arm64",
+        "lib/jansi-native/Windows/x86",
+        "lib/jansi-native/Windows/x86_64"
+      ]
+    },
+    "Tar": {
+      "archive": "apache-maven-3.9.11-bin.tar.gz",
+      "url": "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.11/apache-maven-3.9.11-bin.tar.gz",
+      "sha256": "4B7195B6A4F5C81AF4C0212677A32EE8143643401BC6E1E8412E6B06EA82BEAC",
+      "sha512": "bcfe4fe305c962ace56ac7b5fc7a08b87d5abd8b7e89027ab251069faebee516b0ded8961445d6d91ec1985dfe30f8153268843c89aa392733d1a3ec956c9978",
+      "files": [
+        {
+          "path": "LICENSE",
+          "bytes": 8389,
+          "sha256": "34AD6C700586294F56B50A7CF7120D5F031A6F68099D86C7DE6E860DBE8523AD",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "NOTICE",
+          "bytes": 4854,
+          "sha256": "9739DD84556B9458E60C049A24F4C78F3146B0D57CDDAF5B4FBFB2F71DA259EB",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "README.txt",
+          "bytes": 1279,
+          "sha256": "50204858C8F92F428B6BDE8D420CD96BEBAF23622A68AFCFCF95310487D30C35",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "bin/m2.conf",
+          "bytes": 327,
+          "sha256": "E336769BF93A902BAA7A3E827BA55E4CEF7DE4AF2ED1A9541A4261094D748BA9",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "bin/mvn",
+          "bytes": 6184,
+          "sha256": "F9381D0CB98ABAAF9592DAE421EDDC497E84ED9BFB723B84C111D1350863C3A2",
+          "mode": 493,
+          "archiveMode": 33261
+        },
+        {
+          "path": "bin/mvn.cmd",
+          "bytes": 6778,
+          "sha256": "F89D866139ADD674690BBA0702A0CC4F9769276362C4DA01F96267AB85F6487E",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "bin/mvnDebug",
+          "bytes": 1684,
+          "sha256": "830C2F6E8D55943EADDB7EAFAE0C38ED2651FF933B2CA7B7F8FE3740DDEBBC59",
+          "mode": 493,
+          "archiveMode": 33261
+        },
+        {
+          "path": "bin/mvnDebug.cmd",
+          "bytes": 2169,
+          "sha256": "79E8229561F808F2BE594F7D3BE9D509DC06BBA2B70C87421B58F252C1C79C06",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "bin/mvnyjp",
+          "bytes": 1611,
+          "sha256": "C82CA8E4DA8C343C0FEE8E7895034F015458BA4903C6129B7FD5A9EF4A60E8E3",
+          "mode": 493,
+          "archiveMode": 33261
+        },
+        {
+          "path": "boot/plexus-classworlds-2.9.0.jar",
+          "bytes": 54086,
+          "sha256": "1AD3292CD563381E3FD632F3FDED1988F9E9B2BE7A9F3DB63FF4C4CEDBA13FA5",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "boot/plexus-classworlds.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "conf/logging/simplelogger.properties",
+          "bytes": 1338,
+          "sha256": "42140F6EC135827BEC255A2EBDFA11211387402D13296792FF40E56A96CEDDF8",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "conf/settings.xml",
+          "bytes": 10528,
+          "sha256": "2F552325AEDD9A9C9268DF520BE22CFE3AA86260B76A0F830D2796D2F0E22BD4",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "conf/toolchains.xml",
+          "bytes": 3645,
+          "sha256": "716A6E73E4B0131A72C7329CF7A9CBFB75AFC3042ED732CD1862BDFCD89C1311",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/aopalliance-1.0.jar",
+          "bytes": 4467,
+          "sha256": "0ADDEC670FEDCD3F113C5C8091D783280D23F75E3ACB841B61A9CDB079376A08",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/aopalliance.license",
+          "bytes": 13,
+          "sha256": "F6960BE1B71D602352D7D9DE76A564F54F3DAB550B23FA5674049F842116CA55",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/asm-9.8.jar",
+          "bytes": 126113,
+          "sha256": "876EAB6A83DAECAD5CA67EB9FCABB063C97B5AEB8CF1FCA7A989ECDE17522051",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/asm.license",
+          "bytes": 1626,
+          "sha256": "8C920015A749851EDEA93F71116D45DCD6BEEFA6069B6BAF526C0ADCAF26979C",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/commons-cli-1.9.0.jar",
+          "bytes": 75479,
+          "sha256": "D3D530D0F28FD0FBBFFE2B0B338F70E8CB96F1605579E2E3ABD4DB29CAC24E69",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/commons-cli.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/commons-codec-1.18.0.jar",
+          "bytes": 373045,
+          "sha256": "BA005F304CEF92A3DEDE24A38AD5AC9B8AFCCF0D8F75839D6C1338634CF7F6E4",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/commons-codec.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/error_prone_annotations-2.38.0.jar",
+          "bytes": 20389,
+          "sha256": "6661D5335090A5FC61DD869D2095BC6C1E2156E3AA47A6E4ABABDF64C99A7889",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/error_prone_annotations.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/ext/README.txt",
+          "bytes": 143,
+          "sha256": "E37E36D87F66A9C1CC131519BD18FB5E89318F42C58589096EA539FA8E411F6F",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/ext/hazelcast/README.txt",
+          "bytes": 300,
+          "sha256": "9AF1E954AA54AD0CE9FFA1677DE9D82F45EB8FB0B0F1EB84907DC7552DEE9565",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/ext/redisson/README.txt",
+          "bytes": 295,
+          "sha256": "407F3240C5C288422C714440C8B79B5B5125225B368BE45CB832E418E39CF255",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/failureaccess-1.0.3.jar",
+          "bytes": 10763,
+          "sha256": "CBFC3906B19B8F55DD7CFD6DFE0AA4532E834250D7F080BD8D211A3E246B59CB",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/failureaccess.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/gson-2.13.1.jar",
+          "bytes": 286972,
+          "sha256": "94855942D4992F112946D3DE1C334E709237B8126D8130BF07807C018A4A2120",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/gson.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/guava-33.4.8-jre.jar",
+          "bytes": 3023797,
+          "sha256": "F3D7F57F67FD622F4D468DFDD692B3A5E3909246C28017AC3263405F0FE617ED",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/guava.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/guice-5.1.0-classes.jar",
+          "bytes": 656919,
+          "sha256": "142AD4475E19524D2FE3AC995B3F7CBC962FC726F2EDB9DBDCCC61FEAB9B2BF9",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/guice.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/httpclient-4.5.14.jar",
+          "bytes": 785639,
+          "sha256": "C8BC7E1C51A6D4CE72F40D2EBBABF1C4B68BFE76E732104B04381B493478E9D6",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/httpclient.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/httpcore-4.4.16.jar",
+          "bytes": 327891,
+          "sha256": "6C9B3DD142A09DC468E23AD39AAD6F75A0F2B85125104469F026E52A474E464F",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/httpcore.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/jansi-2.4.2.jar",
+          "bytes": 256537,
+          "sha256": "0B7B8B003A90EA491579B62F5118828E45112914C65589B00FAA49D6EC785839",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/jansi-native/README.txt",
+          "bytes": 490,
+          "sha256": "068181E1D2E6BDC495C1C389BD74EB8932D3DA992731D8C630847486C0D7EC02",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/jansi-native/Windows/arm64/jansi.dll",
+          "bytes": 81408,
+          "sha256": "470E6DFC44B28D628E404D5D6BFBB14728C7973E2397D9149430C85171389A19",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/jansi-native/Windows/x86/jansi.dll",
+          "bytes": 115972,
+          "sha256": "9E6409C3264A6F33F5F97C58265C06E95BF91A896E8E179EBAEB8204C5D19ED3",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/jansi-native/Windows/x86_64/jansi.dll",
+          "bytes": 130522,
+          "sha256": "7020260C8DB5116042315EA73714AC36AD94ACDC330852280E889212506085C0",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/jansi.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/javax.annotation-api-1.3.2.jar",
+          "bytes": 26586,
+          "sha256": "E04BA5195BCD555DC95650F7CC614D151E4BCD52D29A10B8AA2197F3AB89AB9B",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/javax.annotation-api.license",
+          "bytes": 39395,
+          "sha256": "1B087AD282CB3CD0A11E4E160318EAB4FF0995AAE7D22E6AC0D30367E196C6E3",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/javax.inject-1.jar",
+          "bytes": 2497,
+          "sha256": "91C77044A50C481636C32D916FD89C9118A72195390452C81065080F957DE7FF",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/javax.inject.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/jcl-over-slf4j-1.7.36.jar",
+          "bytes": 16555,
+          "sha256": "AB57CA8FD223772C17365D121F59E94ECBF0AE59D08C03A3CB5B81071C019195",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/jcl-over-slf4j.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/jspecify-1.0.0.jar",
+          "bytes": 3819,
+          "sha256": "1FAD6E6BE7557781E4D33729D49AE1CDC8FDDA6FE477BB0CC68CE351EAFDFBAB",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/jspecify.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-artifact-3.9.11.jar",
+          "bytes": 58821,
+          "sha256": "0BFD1C121F907642344311D81E4DFD93EBA6C24DC712CC0AEAE273EB22833022",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-builder-support-3.9.11.jar",
+          "bytes": 14351,
+          "sha256": "5B1DE1560EC19C4C69A655F986455888F3A0BCC3C160CAC1F1EDB87DE3825F77",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-compat-3.9.11.jar",
+          "bytes": 288160,
+          "sha256": "B0E2865FC808FD9FB3BEE95BF37C0609EEB20C59BF1E6B958B37B365EE11F52E",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-core-3.9.11.jar",
+          "bytes": 713140,
+          "sha256": "93D3C0523DDA6C86C6620D9E692E7DF39D0E2E4E4CD860061A8C0D274C2AD185",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-embedder-3.9.11.jar",
+          "bytes": 117172,
+          "sha256": "7E15E05035331D0A7E0FE56D7354B2B30E15C0A8C60863CBF28DF25190E197DB",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-model-3.9.11.jar",
+          "bytes": 217939,
+          "sha256": "163AA596F976264384EFEB50B4CB8A806086FD64A9B755AD1F69195FED3998AD",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-model-builder-3.9.11.jar",
+          "bytes": 208642,
+          "sha256": "C4C72ACCDCD848332C1A37995610A6A369D49FDAABC43E85F0022A5B77DE3BA7",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-plugin-api-3.9.11.jar",
+          "bytes": 47119,
+          "sha256": "8E985A56412564CF687040EFED8BCD3A63EAC2202A824BB01E1D5ECE2B87458F",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-repository-metadata-3.9.11.jar",
+          "bytes": 28530,
+          "sha256": "F8655F5F0060E0032944F2A23688D186E140D2184749BCFA1927F83CD6A8B1A2",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-resolver-api-1.9.24.jar",
+          "bytes": 157239,
+          "sha256": "C0CE14849298720DCF3B09FE9E263B3C576D2D6CD43C61F8AA9D6117E04E5E47",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-resolver-connector-basic-1.9.24.jar",
+          "bytes": 40355,
+          "sha256": "18B7D557C41379DB8B157BA95263C676F52C293F5416B67BD1DB083E99B30383",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-resolver-impl-1.9.24.jar",
+          "bytes": 320116,
+          "sha256": "3CD88EDDA00C46242CDBE57AEFB47703519D176D9E8A500333DE15FAF41B0E1D",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-resolver-named-locks-1.9.24.jar",
+          "bytes": 37937,
+          "sha256": "A222B0A5CA4C145E8E0F45207A23BCCE18BDBE1F1C980E4E9FB332591EE8C91A",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-resolver-provider-3.9.11.jar",
+          "bytes": 79012,
+          "sha256": "B5D6E52AE1ECF1CB62EDE2234234BA3093149524066488E84415187CE478C582",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-resolver-spi-1.9.24.jar",
+          "bytes": 51655,
+          "sha256": "E3153906E93333C106EE18BABB72BA7984CCB15E9116EA08F88C71B8D9387E01",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-resolver-transport-file-1.9.24.jar",
+          "bytes": 16213,
+          "sha256": "B09268D41E1DFCAE15A829D45A512CA29D62B727421D3BD6383AC6252E5E960F",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-resolver-transport-http-1.9.24.jar",
+          "bytes": 62893,
+          "sha256": "A0DE339A8DD3473D9ABAA1CF974507F38783E26AF31D36A90C1E59CC8714DED0",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-resolver-transport-wagon-1.9.24.jar",
+          "bytes": 32466,
+          "sha256": "78ED57FA2123A2D84FAD7A0B15CA73B89DF47C10294D02D6F8121C4D0E5050CB",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-resolver-util-1.9.24.jar",
+          "bytes": 195913,
+          "sha256": "AEB7E776A8C47B1C317A2581F299E2525B044CB8ABDE31164E970BBBEFAB12B1",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-settings-3.9.11.jar",
+          "bytes": 44672,
+          "sha256": "026718D47D19E360D978857BC63D3DC065884FC2C801563D8A2A77B5AB74CCF8",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-settings-builder-3.9.11.jar",
+          "bytes": 42356,
+          "sha256": "33C96E4CA5A15B7C93180F6B2F8DEB15F511DFC15DDA0D2B671C968B22108972",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-shared-utils-3.4.2.jar",
+          "bytes": 151103,
+          "sha256": "B613357E1BAD4DFC1DEAD801691C9460F9585FE7C6B466BC25186212D7D18487",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/maven-slf4j-provider-3.9.11.jar",
+          "bytes": 23672,
+          "sha256": "76D9FA894FA61D1492877CA599CB5AB28CA4573D5F389D6C12A8233B995335F9",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/org.eclipse.sisu.inject-0.9.0.M4.jar",
+          "bytes": 305040,
+          "sha256": "1CBD7A965A5E2A9EA823BAB311962A4E5AA5C240705BDBAD5A52B40FFDFA1004",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/org.eclipse.sisu.inject.license",
+          "bytes": 14196,
+          "sha256": "209FE24BF55677BBF81C2B0481C1403201FAB57B3B4C609971EBA4EC8162B99C",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/org.eclipse.sisu.plexus-0.9.0.M4.jar",
+          "bytes": 215833,
+          "sha256": "B90579BC652EAC7331436E0A25533FCE14130B9C6E015F2DD3A3D4BB07E942B7",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/org.eclipse.sisu.plexus.license",
+          "bytes": 14196,
+          "sha256": "209FE24BF55677BBF81C2B0481C1403201FAB57B3B4C609971EBA4EC8162B99C",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/plexus-cipher-2.0.jar",
+          "bytes": 13003,
+          "sha256": "9A7F1B5C5A9EFFD61EADFD8731452A2F76A8E79111FAC391EF75EA801BEA203A",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/plexus-cipher.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/plexus-component-annotations-2.2.0.jar",
+          "bytes": 4151,
+          "sha256": "50EDB93C73786E62822B4FE1336E22880FDF147191373CF5C911370E16748FCF",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/plexus-component-annotations.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/plexus-interpolation-1.28.jar",
+          "bytes": 87143,
+          "sha256": "AB2A8715570438A2E4164D85AD3E8D489EABC38EA5093C2EB8AB7F58403535B5",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/plexus-interpolation.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/plexus-sec-dispatcher-2.0.jar",
+          "bytes": 23604,
+          "sha256": "873139960C4C780176DDA580B003A2C4BF82188BDCE5BB99234E224EF7ACFCEB",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/plexus-sec-dispatcher.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/plexus-utils-3.6.0.jar",
+          "bytes": 271773,
+          "sha256": "27EF130E32C236090E408FB5498D94CB9EA26D14070FB1C8985D607B62D098D1",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/plexus-utils.license",
+          "bytes": 11358,
+          "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/slf4j-api-1.7.36.jar",
+          "bytes": 41125,
+          "sha256": "D3EF575E3E4979678DC01BF1DCCE51021493B4D11FB7F1BE8AD982877C16A1C0",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/slf4j-api.license",
+          "bytes": 1154,
+          "sha256": "6FBE2EAF44B193B8A40EED9208F52848572224AD8D7672DD09418AA174847E73",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/wagon-file-3.5.3.jar",
+          "bytes": 11350,
+          "sha256": "AFC9216FA97B78DAD227B4A8D4D67B9897BF113A57F80598D62993841113E103",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/wagon-http-3.5.3.jar",
+          "bytes": 9405,
+          "sha256": "D2B6E48C9FCBE579E1858C622D14464011FF265FA6E28E794004A6882154A509",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/wagon-http-shared-3.5.3.jar",
+          "bytes": 40832,
+          "sha256": "8E7DA766F55164FDE8779AAAA125832506C2848CAB4876B5305138873E28037F",
+          "mode": 420,
+          "archiveMode": 33188
+        },
+        {
+          "path": "lib/wagon-provider-api-3.5.3.jar",
+          "bytes": 55101,
+          "sha256": "5E72000338945ED3E96F8E4F578D1D0672E1AF7E19C0E9014197AE5B31AF3EF4",
+          "mode": 420,
+          "archiveMode": 33188
+        }
+      ],
+      "directories": [
+        {
+          "path": "boot",
+          "mode": 493,
+          "archiveMode": 16877
+        },
+        {
+          "path": "conf",
+          "mode": 493,
+          "archiveMode": 16877
+        },
+        {
+          "path": "conf/logging",
+          "mode": 493,
+          "archiveMode": 16877
+        },
+        {
+          "path": "lib",
+          "mode": 493,
+          "archiveMode": 16877
+        },
+        {
+          "path": "lib/ext",
+          "mode": 493,
+          "archiveMode": 16877
+        },
+        {
+          "path": "lib/ext/hazelcast",
+          "mode": 493,
+          "archiveMode": 16877
+        },
+        {
+          "path": "lib/ext/redisson",
+          "mode": 493,
+          "archiveMode": 16877
+        },
+        {
+          "path": "lib/jansi-native",
+          "mode": 493,
+          "archiveMode": 16877
+        },
+        {
+          "path": "lib/jansi-native/Windows",
+          "mode": 493,
+          "archiveMode": 16877
+        },
+        {
+          "path": "lib/jansi-native/Windows/arm64",
+          "mode": 493,
+          "archiveMode": 16877
+        },
+        {
+          "path": "lib/jansi-native/Windows/x86",
+          "mode": 493,
+          "archiveMode": 16877
+        },
+        {
+          "path": "lib/jansi-native/Windows/x86_64",
+          "mode": 493,
+          "archiveMode": 16877
+        }
+      ],
+      "explicitRepeatedDirectoryRecords": [
+        {
+          "path": "lib/jansi-native",
+          "archiveMode": 16877
+        }
+      ],
+      "physicalDirectories": [
+        "bin",
+        "boot",
+        "conf",
+        "conf/logging",
+        "lib",
+        "lib/ext",
+        "lib/ext/hazelcast",
+        "lib/ext/redisson",
+        "lib/jansi-native",
+        "lib/jansi-native/Windows",
+        "lib/jansi-native/Windows/arm64",
+        "lib/jansi-native/Windows/x86",
+        "lib/jansi-native/Windows/x86_64"
+      ]
+    }
+  },
+  "fileBytesAcrossFormats": "EXACT_IDENTICAL_NO_NORMALIZATION",
+  "fileModeDifferences": [],
+  "explicitDirectoryRecordDifferences": {
+    "Zip": [
+      "bin"
+    ],
+    "Tar": []
+  }
+}

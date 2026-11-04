@@ -1,0 +1,30 @@
+{
+  "jdk": {
+    "archiveSha256": "F227CC459FBD65A42C1B28123D68E207EB500899C1C78238F21A038CD33688A3",
+    "authority": "Existing hobl-contract workflow and retained actual matched Windows jdk-archive receipt",
+    "javaSha256": "094E0F67B96E6351F831C686A9B0C450DB55639639CFDD7F9E77597C83B928B0",
+    "url": "https://aka.ms/download-jdk/microsoft-jdk-25.0.5.0.2-windows-aarch64.zip"
+  },
+  "nativeRuntimeAllocated": false,
+  "runtimeRows": 30,
+  "schema": "windows-hosted-input-provenance-v1",
+  "mvnd": {
+    "version": "1.0.3",
+    "archiveSha256": "EFE788E475F8433E855AC05F92E129DC3790517B58002620BA4DD8D264DCD511"
+  },
+  "core": {
+    "url": "https://github.com/PowerShell/PowerShell/releases/download/v7.6.9/PowerShell-7.6.9-win-arm64.zip",
+    "binaryExecuted": false,
+    "assetId": 675639035,
+    "releaseId": 423544544,
+    "entry": "pwsh.exe",
+    "signatureVerification": "Not performed; official API SHA256 checked",
+    "machine": "AA64",
+    "archiveSha256": "2157FB002178E606C2A5532C56647118D90D029742F04D4900A71E3B478C2363",
+    "version": "7.6.9",
+    "publisher": "PowerShell/PowerShell exact v7.6.9 GitHub release API asset digest",
+    "sha256": "BBDF538AEA81C09F60732219B451A26C64F6F2B22BEE05EEECE13DBA909D36E4",
+    "archiveBytes": 102310068
+  },
+  "jniProvenanceSha256": "A314822B548A08EBC3426E878A3FAB38BB45F81E153FBCAA1F067B7C29AB515F"
+}

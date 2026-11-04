@@ -1,0 +1,612 @@
+[
+  {
+    "path": "bin/mvnd-bash-completion.bash",
+    "bytes": 21307,
+    "sha256": "19A50D5603BB3E3912A3FE88143F6C0CC60758D5820ADA05DC9D902DFF94262B"
+  },
+  {
+    "path": "bin/mvnd-client.conf",
+    "bytes": 1359,
+    "sha256": "599E54E32BB4FC1BE68C1B034C8C76B6A0D7C283460F1B3B1230A13A33CE8CAC"
+  },
+  {
+    "path": "bin/mvnd-daemon.conf",
+    "bytes": 1352,
+    "sha256": "A6C3E8071B4C239F46FA044E3CD87E5F8FED6CCFA575B6C6E1AA5243C5A34FCA"
+  },
+  {
+    "path": "bin/mvnd.cmd",
+    "bytes": 7375,
+    "sha256": "E52B9438225BF2DCBD884470966D5054A706AF7A70B5151A94568CFA4452A52A"
+  },
+  {
+    "path": "bin/mvnd.exe",
+    "bytes": 31191040,
+    "sha256": "2E40DFC7674CED8CEEE5935CB514DBEEDAB8DE10C64920D9F669061EBA870716"
+  },
+  {
+    "path": "bin/mvnd.sh",
+    "bytes": 7066,
+    "sha256": "EBF8379442094546E1A347AF34906B1900BF2EE7C183F8CDCD8E0AEAFFF5B15D"
+  },
+  {
+    "path": "bin/platform-windows-amd64",
+    "bytes": 631,
+    "sha256": "5B611E7C9CDB13E366B06A713EB221A8521A3D935D5F1AD607F6E70AC8E8E1D8"
+  },
+  {
+    "path": "conf/mvnd.properties",
+    "bytes": 5278,
+    "sha256": "27929DD5B6C16960E380F08C0EEC193F777270C488821EFA8613E8F60B95327D"
+  },
+  {
+    "path": "LICENSE.txt",
+    "bytes": 11562,
+    "sha256": "F2FFA5942B316849BE283DEAEB2912E2E5B5B17E91012BEDE8210210FF3E91E7"
+  },
+  {
+    "path": "LOCAL-UNRELEASED-ARM64-JVM-SUPPLEMENT.txt",
+    "bytes": 344,
+    "sha256": "CCCE7A285A2559725058BC6FBCB6345A247075C5367212625A119DB40996C9FF"
+  },
+  {
+    "path": "mvn/bin/m2.conf",
+    "bytes": 1426,
+    "sha256": "66F36B5D96D0BB2F7BFF700B733235F4AB017E2C759FA4CA7DAB39B8A1E945FC"
+  },
+  {
+    "path": "mvn/bin/mvn",
+    "bytes": 6184,
+    "sha256": "F9381D0CB98ABAAF9592DAE421EDDC497E84ED9BFB723B84C111D1350863C3A2"
+  },
+  {
+    "path": "mvn/bin/mvn.cmd",
+    "bytes": 6778,
+    "sha256": "F89D866139ADD674690BBA0702A0CC4F9769276362C4DA01F96267AB85F6487E"
+  },
+  {
+    "path": "mvn/bin/mvnDebug",
+    "bytes": 1684,
+    "sha256": "830C2F6E8D55943EADDB7EAFAE0C38ED2651FF933B2CA7B7F8FE3740DDEBBC59"
+  },
+  {
+    "path": "mvn/bin/mvnDebug.cmd",
+    "bytes": 2169,
+    "sha256": "79E8229561F808F2BE594F7D3BE9D509DC06BBA2B70C87421B58F252C1C79C06"
+  },
+  {
+    "path": "mvn/bin/mvnyjp",
+    "bytes": 1611,
+    "sha256": "C82CA8E4DA8C343C0FEE8E7895034F015458BA4903C6129B7FD5A9EF4A60E8E3"
+  },
+  {
+    "path": "mvn/boot/plexus-classworlds-2.9.0.jar",
+    "bytes": 54086,
+    "sha256": "1AD3292CD563381E3FD632F3FDED1988F9E9B2BE7A9F3DB63FF4C4CEDBA13FA5"
+  },
+  {
+    "path": "mvn/boot/plexus-classworlds.license",
+    "bytes": 11358,
+    "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30"
+  },
+  {
+    "path": "mvn/conf/logging/java.util.logging.properties",
+    "bytes": 802,
+    "sha256": "5E75D862F5B885900372ACE82DDD6810BE885F7DE2D4465030705528AB7F41BE"
+  },
+  {
+    "path": "mvn/conf/logging/simplelogger.properties",
+    "bytes": 1338,
+    "sha256": "42140F6EC135827BEC255A2EBDFA11211387402D13296792FF40E56A96CEDDF8"
+  },
+  {
+    "path": "mvn/conf/settings.xml",
+    "bytes": 10528,
+    "sha256": "2F552325AEDD9A9C9268DF520BE22CFE3AA86260B76A0F830D2796D2F0E22BD4"
+  },
+  {
+    "path": "mvn/conf/toolchains.xml",
+    "bytes": 3645,
+    "sha256": "716A6E73E4B0131A72C7329CF7A9CBFB75AFC3042ED732CD1862BDFCD89C1311"
+  },
+  {
+    "path": "mvn/lib/aopalliance-1.0.jar",
+    "bytes": 4467,
+    "sha256": "0ADDEC670FEDCD3F113C5C8091D783280D23F75E3ACB841B61A9CDB079376A08"
+  },
+  {
+    "path": "mvn/lib/aopalliance.license",
+    "bytes": 13,
+    "sha256": "F6960BE1B71D602352D7D9DE76A564F54F3DAB550B23FA5674049F842116CA55"
+  },
+  {
+    "path": "mvn/lib/asm-9.8.jar",
+    "bytes": 126113,
+    "sha256": "876EAB6A83DAECAD5CA67EB9FCABB063C97B5AEB8CF1FCA7A989ECDE17522051"
+  },
+  {
+    "path": "mvn/lib/asm.license",
+    "bytes": 1626,
+    "sha256": "8C920015A749851EDEA93F71116D45DCD6BEEFA6069B6BAF526C0ADCAF26979C"
+  },
+  {
+    "path": "mvn/lib/commons-cli-1.9.0.jar",
+    "bytes": 75479,
+    "sha256": "D3D530D0F28FD0FBBFFE2B0B338F70E8CB96F1605579E2E3ABD4DB29CAC24E69"
+  },
+  {
+    "path": "mvn/lib/commons-cli.license",
+    "bytes": 11358,
+    "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30"
+  },
+  {
+    "path": "mvn/lib/commons-codec-1.18.0.jar",
+    "bytes": 373045,
+    "sha256": "BA005F304CEF92A3DEDE24A38AD5AC9B8AFCCF0D8F75839D6C1338634CF7F6E4"
+  },
+  {
+    "path": "mvn/lib/commons-codec.license",
+    "bytes": 11358,
+    "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30"
+  },
+  {
+    "path": "mvn/lib/error_prone_annotations-2.38.0.jar",
+    "bytes": 20389,
+    "sha256": "6661D5335090A5FC61DD869D2095BC6C1E2156E3AA47A6E4ABABDF64C99A7889"
+  },
+  {
+    "path": "mvn/lib/error_prone_annotations.license",
+    "bytes": 11358,
+    "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30"
+  },
+  {
+    "path": "mvn/lib/ext/hazelcast/README.txt",
+    "bytes": 300,
+    "sha256": "9AF1E954AA54AD0CE9FFA1677DE9D82F45EB8FB0B0F1EB84907DC7552DEE9565"
+  },
+  {
+    "path": "mvn/lib/ext/README.txt",
+    "bytes": 143,
+    "sha256": "E37E36D87F66A9C1CC131519BD18FB5E89318F42C58589096EA539FA8E411F6F"
+  },
+  {
+    "path": "mvn/lib/ext/redisson/README.txt",
+    "bytes": 295,
+    "sha256": "407F3240C5C288422C714440C8B79B5B5125225B368BE45CB832E418E39CF255"
+  },
+  {
+    "path": "mvn/lib/failureaccess-1.0.3.jar",
+    "bytes": 10763,
+    "sha256": "CBFC3906B19B8F55DD7CFD6DFE0AA4532E834250D7F080BD8D211A3E246B59CB"
+  },
+  {
+    "path": "mvn/lib/failureaccess.license",
+    "bytes": 11358,
+    "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30"
+  },
+  {
+    "path": "mvn/lib/gson-2.13.1.jar",
+    "bytes": 286972,
+    "sha256": "94855942D4992F112946D3DE1C334E709237B8126D8130BF07807C018A4A2120"
+  },
+  {
+    "path": "mvn/lib/gson.license",
+    "bytes": 11358,
+    "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30"
+  },
+  {
+    "path": "mvn/lib/guava-33.4.8-jre.jar",
+    "bytes": 3023797,
+    "sha256": "F3D7F57F67FD622F4D468DFDD692B3A5E3909246C28017AC3263405F0FE617ED"
+  },
+  {
+    "path": "mvn/lib/guava.license",
+    "bytes": 11358,
+    "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30"
+  },
+  {
+    "path": "mvn/lib/guice-5.1.0-classes.jar",
+    "bytes": 656919,
+    "sha256": "142AD4475E19524D2FE3AC995B3F7CBC962FC726F2EDB9DBDCCC61FEAB9B2BF9"
+  },
+  {
+    "path": "mvn/lib/guice.license",
+    "bytes": 11358,
+    "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30"
+  },
+  {
+    "path": "mvn/lib/httpclient-4.5.14.jar",
+    "bytes": 785639,
+    "sha256": "C8BC7E1C51A6D4CE72F40D2EBBABF1C4B68BFE76E732104B04381B493478E9D6"
+  },
+  {
+    "path": "mvn/lib/httpclient.license",
+    "bytes": 11358,
+    "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30"
+  },
+  {
+    "path": "mvn/lib/httpcore-4.4.16.jar",
+    "bytes": 327891,
+    "sha256": "6C9B3DD142A09DC468E23AD39AAD6F75A0F2B85125104469F026E52A474E464F"
+  },
+  {
+    "path": "mvn/lib/httpcore.license",
+    "bytes": 11358,
+    "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30"
+  },
+  {
+    "path": "mvn/lib/jansi-2.4.2.jar",
+    "bytes": 256537,
+    "sha256": "0B7B8B003A90EA491579B62F5118828E45112914C65589B00FAA49D6EC785839"
+  },
+  {
+    "path": "mvn/lib/jansi-native/README.txt",
+    "bytes": 490,
+    "sha256": "068181E1D2E6BDC495C1C389BD74EB8932D3DA992731D8C630847486C0D7EC02"
+  },
+  {
+    "path": "mvn/lib/jansi-native/Windows/arm64/jansi.dll",
+    "bytes": 81408,
+    "sha256": "470E6DFC44B28D628E404D5D6BFBB14728C7973E2397D9149430C85171389A19"
+  },
+  {
+    "path": "mvn/lib/jansi-native/Windows/x86/jansi.dll",
+    "bytes": 115972,
+    "sha256": "9E6409C3264A6F33F5F97C58265C06E95BF91A896E8E179EBAEB8204C5D19ED3"
+  },
+  {
+    "path": "mvn/lib/jansi-native/Windows/x86_64/jansi.dll",
+    "bytes": 130522,
+    "sha256": "7020260C8DB5116042315EA73714AC36AD94ACDC330852280E889212506085C0"
+  },
+  {
+    "path": "mvn/lib/jansi.license",
+    "bytes": 11358,
+    "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30"
+  },
+  {
+    "path": "mvn/lib/javax.annotation-api-1.3.2.jar",
+    "bytes": 26586,
+    "sha256": "E04BA5195BCD555DC95650F7CC614D151E4BCD52D29A10B8AA2197F3AB89AB9B"
+  },
+  {
+    "path": "mvn/lib/javax.annotation-api.license",
+    "bytes": 39395,
+    "sha256": "1B087AD282CB3CD0A11E4E160318EAB4FF0995AAE7D22E6AC0D30367E196C6E3"
+  },
+  {
+    "path": "mvn/lib/javax.inject-1.jar",
+    "bytes": 2497,
+    "sha256": "91C77044A50C481636C32D916FD89C9118A72195390452C81065080F957DE7FF"
+  },
+  {
+    "path": "mvn/lib/javax.inject.license",
+    "bytes": 11358,
+    "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30"
+  },
+  {
+    "path": "mvn/lib/jcl-over-slf4j-1.7.36.jar",
+    "bytes": 16555,
+    "sha256": "AB57CA8FD223772C17365D121F59E94ECBF0AE59D08C03A3CB5B81071C019195"
+  },
+  {
+    "path": "mvn/lib/jcl-over-slf4j.license",
+    "bytes": 11358,
+    "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30"
+  },
+  {
+    "path": "mvn/lib/jspecify-1.0.0.jar",
+    "bytes": 3819,
+    "sha256": "1FAD6E6BE7557781E4D33729D49AE1CDC8FDDA6FE477BB0CC68CE351EAFDFBAB"
+  },
+  {
+    "path": "mvn/lib/jspecify.license",
+    "bytes": 11358,
+    "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30"
+  },
+  {
+    "path": "mvn/lib/jul-to-slf4j-1.7.36.jar",
+    "bytes": 4519,
+    "sha256": "9E641FB142C5F0B0623D6222C09EA87523A41BF6BED48AC79940724010B989DE"
+  },
+  {
+    "path": "mvn/lib/maven-artifact-3.9.11.jar",
+    "bytes": 58821,
+    "sha256": "0BFD1C121F907642344311D81E4DFD93EBA6C24DC712CC0AEAE273EB22833022"
+  },
+  {
+    "path": "mvn/lib/maven-builder-support-3.9.11.jar",
+    "bytes": 14351,
+    "sha256": "5B1DE1560EC19C4C69A655F986455888F3A0BCC3C160CAC1F1EDB87DE3825F77"
+  },
+  {
+    "path": "mvn/lib/maven-compat-3.9.11.jar",
+    "bytes": 288160,
+    "sha256": "B0E2865FC808FD9FB3BEE95BF37C0609EEB20C59BF1E6B958B37B365EE11F52E"
+  },
+  {
+    "path": "mvn/lib/maven-core-3.9.11.jar",
+    "bytes": 713140,
+    "sha256": "93D3C0523DDA6C86C6620D9E692E7DF39D0E2E4E4CD860061A8C0D274C2AD185"
+  },
+  {
+    "path": "mvn/lib/maven-embedder-3.9.11.jar",
+    "bytes": 117172,
+    "sha256": "7E15E05035331D0A7E0FE56D7354B2B30E15C0A8C60863CBF28DF25190E197DB"
+  },
+  {
+    "path": "mvn/lib/maven-model-3.9.11.jar",
+    "bytes": 217939,
+    "sha256": "163AA596F976264384EFEB50B4CB8A806086FD64A9B755AD1F69195FED3998AD"
+  },
+  {
+    "path": "mvn/lib/maven-model-builder-3.9.11.jar",
+    "bytes": 208642,
+    "sha256": "C4C72ACCDCD848332C1A37995610A6A369D49FDAABC43E85F0022A5B77DE3BA7"
+  },
+  {
+    "path": "mvn/lib/maven-plugin-api-3.9.11.jar",
+    "bytes": 47119,
+    "sha256": "8E985A56412564CF687040EFED8BCD3A63EAC2202A824BB01E1D5ECE2B87458F"
+  },
+  {
+    "path": "mvn/lib/maven-repository-metadata-3.9.11.jar",
+    "bytes": 28530,
+    "sha256": "F8655F5F0060E0032944F2A23688D186E140D2184749BCFA1927F83CD6A8B1A2"
+  },
+  {
+    "path": "mvn/lib/maven-resolver-api-1.9.24.jar",
+    "bytes": 157239,
+    "sha256": "C0CE14849298720DCF3B09FE9E263B3C576D2D6CD43C61F8AA9D6117E04E5E47"
+  },
+  {
+    "path": "mvn/lib/maven-resolver-connector-basic-1.9.24.jar",
+    "bytes": 40355,
+    "sha256": "18B7D557C41379DB8B157BA95263C676F52C293F5416B67BD1DB083E99B30383"
+  },
+  {
+    "path": "mvn/lib/maven-resolver-impl-1.9.24.jar",
+    "bytes": 320116,
+    "sha256": "3CD88EDDA00C46242CDBE57AEFB47703519D176D9E8A500333DE15FAF41B0E1D"
+  },
+  {
+    "path": "mvn/lib/maven-resolver-named-locks-1.9.24.jar",
+    "bytes": 37937,
+    "sha256": "A222B0A5CA4C145E8E0F45207A23BCCE18BDBE1F1C980E4E9FB332591EE8C91A"
+  },
+  {
+    "path": "mvn/lib/maven-resolver-provider-3.9.11.jar",
+    "bytes": 79012,
+    "sha256": "B5D6E52AE1ECF1CB62EDE2234234BA3093149524066488E84415187CE478C582"
+  },
+  {
+    "path": "mvn/lib/maven-resolver-spi-1.9.24.jar",
+    "bytes": 51655,
+    "sha256": "E3153906E93333C106EE18BABB72BA7984CCB15E9116EA08F88C71B8D9387E01"
+  },
+  {
+    "path": "mvn/lib/maven-resolver-transport-file-1.9.24.jar",
+    "bytes": 16213,
+    "sha256": "B09268D41E1DFCAE15A829D45A512CA29D62B727421D3BD6383AC6252E5E960F"
+  },
+  {
+    "path": "mvn/lib/maven-resolver-transport-http-1.9.24.jar",
+    "bytes": 62893,
+    "sha256": "A0DE339A8DD3473D9ABAA1CF974507F38783E26AF31D36A90C1E59CC8714DED0"
+  },
+  {
+    "path": "mvn/lib/maven-resolver-transport-wagon-1.9.24.jar",
+    "bytes": 32466,
+    "sha256": "78ED57FA2123A2D84FAD7A0B15CA73B89DF47C10294D02D6F8121C4D0E5050CB"
+  },
+  {
+    "path": "mvn/lib/maven-resolver-util-1.9.24.jar",
+    "bytes": 195913,
+    "sha256": "AEB7E776A8C47B1C317A2581F299E2525B044CB8ABDE31164E970BBBEFAB12B1"
+  },
+  {
+    "path": "mvn/lib/maven-settings-3.9.11.jar",
+    "bytes": 44672,
+    "sha256": "026718D47D19E360D978857BC63D3DC065884FC2C801563D8A2A77B5AB74CCF8"
+  },
+  {
+    "path": "mvn/lib/maven-settings-builder-3.9.11.jar",
+    "bytes": 42356,
+    "sha256": "33C96E4CA5A15B7C93180F6B2F8DEB15F511DFC15DDA0D2B671C968B22108972"
+  },
+  {
+    "path": "mvn/lib/maven-shared-utils-3.4.2.jar",
+    "bytes": 151103,
+    "sha256": "B613357E1BAD4DFC1DEAD801691C9460F9585FE7C6B466BC25186212D7D18487"
+  },
+  {
+    "path": "mvn/lib/mvnd/jline-native-3.30.6.jar",
+    "bytes": 190173,
+    "sha256": "43C36F0934545A9549FB3C8FF3AFA361C320EFE1C94759ECD09B340648397C80"
+  },
+  {
+    "path": "mvn/lib/mvnd/jline-terminal-3.30.6.jar",
+    "bytes": 275464,
+    "sha256": "9A8DFDE8A25B0A9687CF11E0DD4A128665E831F14F9CED85FFC284D3ADBAD374"
+  },
+  {
+    "path": "mvn/lib/mvnd/jline-terminal-ffm-3.30.6.jar",
+    "bytes": 65373,
+    "sha256": "E6A81FF97E993C89547DCA0E66BEAABA5AEBB057195C3CAA24D1CC10265DA37D"
+  },
+  {
+    "path": "mvn/lib/mvnd/jline-terminal-jni-3.30.6.jar",
+    "bytes": 50133,
+    "sha256": "F42A21AC1121E253673A377AAFEC24330D8B646D831E1E02AC856C16A92DE95E"
+  },
+  {
+    "path": "mvn/lib/mvnd/mvnd-agent-1.0.3.jar",
+    "bytes": 803490,
+    "sha256": "F1D232743CFE88821642D9679E9942AB3AB7471815BD794D18A7E17123882B0B"
+  },
+  {
+    "path": "mvn/lib/mvnd/mvnd-client-1.0.3.jar",
+    "bytes": 74481,
+    "sha256": "0F81137624FEA2E933F6BA53680950DC3F116BEFAF2680EE5E2763F519BA245B"
+  },
+  {
+    "path": "mvn/lib/mvnd/mvnd-common-1.0.3.jar",
+    "bytes": 128741,
+    "sha256": "785294565B11590F4F7F34983BCCB5739391D90BC1B1D872FEB1B6FB7E80A834"
+  },
+  {
+    "path": "mvn/lib/mvnd/mvnd-daemon-1.0.3.jar",
+    "bytes": 159704,
+    "sha256": "FE7E8EBBB73BE38D2CD74456891429400FC4F278258D163BC78EA08830B7713D"
+  },
+  {
+    "path": "mvn/lib/mvnd/mvnd-helper-agent-1.0.3.jar",
+    "bytes": 7957,
+    "sha256": "5D8092373A84F148646D22309A4F19DA82BE497368B47DF48971A6ED1B1E75D7"
+  },
+  {
+    "path": "mvn/lib/mvnd/mvnd-native-1.0.3.jar",
+    "bytes": 117677,
+    "sha256": "497B71816749A6260062DCAFCE51D9BD0815D019952F3D821ECB6193F71A5768"
+  },
+  {
+    "path": "mvn/lib/mvnd/plexus-interactivity-api-1.4.jar",
+    "bytes": 10292,
+    "sha256": "3D82C3B8AFB0AC42D0087ADBB6D9AA77E7253BEB6E8B31F9159A3FCD74D5EE3C"
+  },
+  {
+    "path": "mvn/lib/mvnd/takari-smart-builder-1.1.0.jar",
+    "bytes": 36471,
+    "sha256": "4835A5984B767D873FE3AB845A00D7554D433BFBA0D3F3F9D222107D0CFAC4AF"
+  },
+  {
+    "path": "mvn/lib/mvnd-logging-1.0.3.jar",
+    "bytes": 47505,
+    "sha256": "47C80A9E29BA1C77F322E88740209D0CE2D452FAF12C05A27EF151B74A28602D"
+  },
+  {
+    "path": "mvn/lib/org.eclipse.sisu.inject-0.9.0.M4.jar",
+    "bytes": 305040,
+    "sha256": "1CBD7A965A5E2A9EA823BAB311962A4E5AA5C240705BDBAD5A52B40FFDFA1004"
+  },
+  {
+    "path": "mvn/lib/org.eclipse.sisu.inject.license",
+    "bytes": 14196,
+    "sha256": "209FE24BF55677BBF81C2B0481C1403201FAB57B3B4C609971EBA4EC8162B99C"
+  },
+  {
+    "path": "mvn/lib/org.eclipse.sisu.plexus-0.9.0.M4.jar",
+    "bytes": 215833,
+    "sha256": "B90579BC652EAC7331436E0A25533FCE14130B9C6E015F2DD3A3D4BB07E942B7"
+  },
+  {
+    "path": "mvn/lib/org.eclipse.sisu.plexus.license",
+    "bytes": 14196,
+    "sha256": "209FE24BF55677BBF81C2B0481C1403201FAB57B3B4C609971EBA4EC8162B99C"
+  },
+  {
+    "path": "mvn/lib/plexus-cipher-2.0.jar",
+    "bytes": 13003,
+    "sha256": "9A7F1B5C5A9EFFD61EADFD8731452A2F76A8E79111FAC391EF75EA801BEA203A"
+  },
+  {
+    "path": "mvn/lib/plexus-cipher.license",
+    "bytes": 11358,
+    "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30"
+  },
+  {
+    "path": "mvn/lib/plexus-component-annotations-2.2.0.jar",
+    "bytes": 4151,
+    "sha256": "50EDB93C73786E62822B4FE1336E22880FDF147191373CF5C911370E16748FCF"
+  },
+  {
+    "path": "mvn/lib/plexus-component-annotations.license",
+    "bytes": 11358,
+    "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30"
+  },
+  {
+    "path": "mvn/lib/plexus-interpolation-1.28.jar",
+    "bytes": 87143,
+    "sha256": "AB2A8715570438A2E4164D85AD3E8D489EABC38EA5093C2EB8AB7F58403535B5"
+  },
+  {
+    "path": "mvn/lib/plexus-interpolation.license",
+    "bytes": 11358,
+    "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30"
+  },
+  {
+    "path": "mvn/lib/plexus-sec-dispatcher-2.0.jar",
+    "bytes": 23604,
+    "sha256": "873139960C4C780176DDA580B003A2C4BF82188BDCE5BB99234E224EF7ACFCEB"
+  },
+  {
+    "path": "mvn/lib/plexus-sec-dispatcher.license",
+    "bytes": 11358,
+    "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30"
+  },
+  {
+    "path": "mvn/lib/plexus-utils-3.6.0.jar",
+    "bytes": 271773,
+    "sha256": "27EF130E32C236090E408FB5498D94CB9EA26D14070FB1C8985D607B62D098D1"
+  },
+  {
+    "path": "mvn/lib/plexus-utils.license",
+    "bytes": 11358,
+    "sha256": "CFC7749B96F63BD31C3C42B5C471BF756814053E847C10F3EB003417BC523D30"
+  },
+  {
+    "path": "mvn/lib/slf4j-api-1.7.36.jar",
+    "bytes": 41125,
+    "sha256": "D3EF575E3E4979678DC01BF1DCCE51021493B4D11FB7F1BE8AD982877C16A1C0"
+  },
+  {
+    "path": "mvn/lib/slf4j-api.license",
+    "bytes": 1154,
+    "sha256": "6FBE2EAF44B193B8A40EED9208F52848572224AD8D7672DD09418AA174847E73"
+  },
+  {
+    "path": "mvn/lib/wagon-file-3.5.3.jar",
+    "bytes": 11350,
+    "sha256": "AFC9216FA97B78DAD227B4A8D4D67B9897BF113A57F80598D62993841113E103"
+  },
+  {
+    "path": "mvn/lib/wagon-http-3.5.3.jar",
+    "bytes": 9405,
+    "sha256": "D2B6E48C9FCBE579E1858C622D14464011FF265FA6E28E794004A6882154A509"
+  },
+  {
+    "path": "mvn/lib/wagon-http-shared-3.5.3.jar",
+    "bytes": 40832,
+    "sha256": "8E7DA766F55164FDE8779AAAA125832506C2848CAB4876B5305138873E28037F"
+  },
+  {
+    "path": "mvn/lib/wagon-provider-api-3.5.3.jar",
+    "bytes": 55101,
+    "sha256": "5E72000338945ED3E96F8E4F578D1D0672E1AF7E19C0E9014197AE5B31AF3EF4"
+  },
+  {
+    "path": "mvn/LICENSE",
+    "bytes": 8389,
+    "sha256": "34AD6C700586294F56B50A7CF7120D5F031A6F68099D86C7DE6E860DBE8523AD"
+  },
+  {
+    "path": "mvn/NOTICE",
+    "bytes": 4854,
+    "sha256": "9739DD84556B9458E60C049A24F4C78F3146B0D57CDDAF5B4FBFB2F71DA259EB"
+  },
+  {
+    "path": "mvn/README.txt",
+    "bytes": 1279,
+    "sha256": "50204858C8F92F428B6BDE8D420CD96BEBAF23622A68AFCFCF95310487D30C35"
+  },
+  {
+    "path": "NOTICE.txt",
+    "bytes": 452,
+    "sha256": "9C41688A15534555553CD860FD6F3CAE0899F30DFF54FEF77EAFF6640B323E2B"
+  },
+  {
+    "path": "README.adoc",
+    "bytes": 9626,
+    "sha256": "BB4CC5A5FFB8A0E597C826BCE4E7E7A65966401BA610F7F490552051FCC96B45"
+  }
+]

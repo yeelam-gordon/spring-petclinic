@@ -1,0 +1,70 @@
+{
+  "schema": "hobl3911-local-jni-transport-v1",
+  "status": "LOCAL_STAGED_NOT_PUBLISHED_OR_HOSTED_QUALIFIED",
+  "distributionLabel": "LOCAL-UNRELEASED-WINDOWS-ARM64-JVM-SUPPLEMENT",
+  "purpose": "Transport the already qualified native JAR without recompiling or repacking it.",
+  "upstream": {
+    "repository": "https://github.com/apache/maven-mvnd",
+    "commit": "824a1fd42088e27dec6cc7cc392b9122379e7bf0",
+    "version": "1.0.3",
+    "windowsArchiveSha256": "EFE788E475F8433E855AC05F92E129DC3790517B58002620BA4DD8D264DCD511",
+    "originalNativeJarSha256": "08470605F0840F30970D0B0DBAF788A48326DD94AA9FECEDCD21D704B27C6B0C"
+  },
+  "supplement": {
+    "distributionPath": "mvn/lib/mvnd/mvnd-native-1.0.3.jar",
+    "addedEntry": "org/mvndaemon/mvnd/nativ/Windows/arm64/mvndnative.dll",
+    "dllSha256": "728F9A0F7A8A74D15C6DE37DBE32A73CF8013605D2E881098692E1C88A0F4C2D",
+    "originalEntriesPreserved": 54,
+    "entriesAfterSupplement": 55,
+    "compiler": "MSVC 19.51.36260.0 HostARM64/arm64",
+    "compilerSha256": "9F36F48C99F07158A62F3D013247095F318D3560B0C31555F3664F0DE25EBBCB",
+    "compileOptions": ["/LD", "/O2", "/MD", "/MACHINE:ARM64"],
+    "jniHeaders": "Microsoft OpenJDK 25.0.5.0.2+1, include and include/win32",
+    "rebuildReproducibility": "Not established; hosted consumption must preserve these exact JAR bytes.",
+    "releaseStatus": "Local supplement, not an official Windows ARM64 distribution."
+  },
+  "files": [
+    {
+      "file": "mvnd-native-1.0.3.jar",
+      "bytes": 117677,
+      "sha256": "497B71816749A6260062DCAFCE51D9BD0815D019952F3D821ECB6193F71A5768"
+    },
+    {
+      "file": "LICENSE.txt",
+      "bytes": 11562,
+      "sha256": "F2FFA5942B316849BE283DEAEB2912E2E5B5B17E91012BEDE8210210FF3E91E7"
+    },
+    {
+      "file": "NOTICE.txt",
+      "bytes": 452,
+      "sha256": "9C41688A15534555553CD860FD6F3CAE0899F30DFF54FEF77EAFF6640B323E2B"
+    },
+    {
+      "file": "mvndnative.c",
+      "bytes": 4253,
+      "sha256": "31198B329118419DB30A8178FB438F44953B33F346C30E1BF313DF2F4E6A021E"
+    },
+    {
+      "file": "mvndnative.h",
+      "bytes": 4348,
+      "sha256": "E12BE1E39BB5FD0755B87D151D91712D9606D1118B1F6CCAB6BC2CB0857AA9DF"
+    },
+    {
+      "file": "SHA256SUMS.json",
+      "bytes": 19725,
+      "sha256": "0D79A9F4F4656A33AC63DD2D44EAC0AD3F9B19FA0AD9F0810973D32F82B8BAAD"
+    },
+    {
+      "file": "LOCAL-UNRELEASED-ARM64-JVM-SUPPLEMENT.txt",
+      "bytes": 344,
+      "sha256": "CCCE7A285A2559725058BC6FBCB6345A247075C5367212625A119DB40996C9FF"
+    }
+  ],
+  "futureHostedAdmission": [
+    "Review and bind an immutable allowlisted fork Git object and all payload SHA256 values before publication.",
+    "Verify the official archive and original native JAR before replacement.",
+    "Copy the exact staged unreleased label and SHA256SUMS.json into the supplemented distribution; verify all 122 inventory rows and the manifest after replacement.",
+    "Preserve the Apache license, notice, public source provenance and local-unreleased label.",
+    "Do not infer publication authority, hosted qualification or CI allocation from local staging."
+  ]
+}

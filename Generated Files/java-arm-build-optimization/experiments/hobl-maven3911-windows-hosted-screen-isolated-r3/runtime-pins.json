@@ -1,0 +1,152 @@
+[
+  {
+    "bytes": 9157,
+    "sha256": "BAC9B5587A4049B01D49F7B7F2CF4EE318BB04FFDF9FE3343F3DA7154C2AF04F",
+    "file": "H3911.ScreenParent.psm1"
+  },
+  {
+    "bytes": 1402,
+    "sha256": "2647C477FE436284E590ED9E6E2B0C7EA1B0B71B5B8245519E01F40449C887D7",
+    "file": "Invoke-ScreenCandidate.ps1"
+  },
+  {
+    "bytes": 1839,
+    "sha256": "A451B495298D977F0331543F359A606B62ED5B0CEDEE8E93358F0D120DF4A032",
+    "file": "Observe-QualifierOwner.ps1"
+  },
+  {
+    "bytes": 3058,
+    "sha256": "D88BE66DDAD376DA3E4766B1FC7D9BAD0AF70C17A36B308BDB1EDFF8881B1CBB",
+    "file": "ObserverTelemetry.psm1"
+  },
+  {
+    "bytes": 13349,
+    "sha256": "406C71D922394EAA666FE8759390C9114B1457461BA9E4F4C69859CE28A5C647",
+    "file": "OwnedJavaBackstop.psm1"
+  },
+  {
+    "bytes": 11707,
+    "sha256": "0CC62C9A223711ADC1F57902A6E5B0B89F0F42E28E0A67E8CD170ACD3AAAA21A",
+    "file": "Supervise-StagedQualifier.ps1"
+  },
+  {
+    "bytes": 4572,
+    "sha256": "146F7C445AE327686D00B508C15A4E8A8BD9FBC5426B3E020B2CFCDDB90A1B73",
+    "file": "Test-ParentHandoff.ps1"
+  },
+  {
+    "bytes": 6694,
+    "sha256": "119249C3774548270DFE0135F87E94B71DEBEE82B1FCC69ED7E804AB70726AD8",
+    "file": "Test-ScreenCaller.ps1"
+  },
+  {
+    "bytes": 29822,
+    "sha256": "45D9AA3DD7923358A576647F07AAC8D39617A9C9AEA4FBC33C1BA9664E42BCA3",
+    "file": "public/Darwin103.inventory.json"
+  },
+  {
+    "bytes": 10571,
+    "sha256": "BD2B01750B3F6954425599F0E70F34F2A04B122E03724B1482704E76FC6B55F6",
+    "file": "public/H3911.Artifacts.psm1"
+  },
+  {
+    "bytes": 19043,
+    "sha256": "14D87CEFF68D26689C4A05D56BF503C75F8C95942ED4685538738FAD8FB9FE9F",
+    "file": "public/H3911.CallKernel.psm1"
+  },
+  {
+    "bytes": 5095,
+    "sha256": "05F80C9435B3E6012FAE8874A887A7F96AF8B44311EC1D4A06265ED254E7A264",
+    "file": "public/H3911.Darwin103.psm1"
+  },
+  {
+    "bytes": 14765,
+    "sha256": "E676EE877FBDF3E3823EE7B7085C2BB083161ADBCAFFBA644B736CFEADDFAFF2",
+    "file": "public/H3911.DarwinLifecycle.psm1"
+  },
+  {
+    "bytes": 12727,
+    "sha256": "E9A8FD932AC839119FDD0B810533E8FB69BA314CB038E7345C484A7988A36E1E",
+    "file": "public/H3911.DarwinOwner.psm1"
+  },
+  {
+    "bytes": 10572,
+    "sha256": "7943C480E2E73F68554BBE46A30811F54A299EBDBA5FDF7F0A430314EEF12D57",
+    "file": "public/H3911.DistributionSetup.psm1"
+  },
+  {
+    "bytes": 13767,
+    "sha256": "AA208B30F94342541C741E60A94F84A94E3DA3CC0F8C5D236EAC9D4A34267397",
+    "file": "public/H3911.EffectiveOwner.psm1"
+  },
+  {
+    "bytes": 899,
+    "sha256": "7157C8FAA57D0A235D8FE4D906F6482C940789772B086F0179BE3058C3EB6EB8",
+    "file": "public/H3911.Fixtures.psm1"
+  },
+  {
+    "bytes": 13349,
+    "sha256": "406C71D922394EAA666FE8759390C9114B1457461BA9E4F4C69859CE28A5C647",
+    "file": "public/H3911.GateOwner.psm1"
+  },
+  {
+    "bytes": 7087,
+    "sha256": "1F1C0099CDC1A7DA6FE949BF973269418DCAAC0E1539A4598A6E5CCFE3720BAA",
+    "file": "public/H3911.Helpers.psm1"
+  },
+  {
+    "bytes": 6501,
+    "sha256": "6CF9CB37879428520B87738FE8A0CDECEA8E0B6AA6577C068FDABB44F038E5A3",
+    "file": "public/H3911.NativeProcess.psm1"
+  },
+  {
+    "bytes": 2197,
+    "sha256": "99B6CA8A3025FBF5D55C7DE8E1871C8C0BEF47A69CA541D4C1472A73CC6BEF1D",
+    "file": "public/H3911.Offline.psm1"
+  },
+  {
+    "bytes": 33986,
+    "sha256": "CA1E15176728C26C5ED009F53ADEECBF19E9D16B89913FC388A0631F9D96FC22",
+    "file": "public/H3911.PackageSampling.psm1"
+  },
+  {
+    "bytes": 7975,
+    "sha256": "6AC4B84BEEDEED24E6330D556BFAA2954CA2D4771880F2A0C2602AEF5B91A1C0",
+    "file": "public/H3911.Source.psm1"
+  },
+  {
+    "bytes": 5544,
+    "sha256": "3D8DCF80AFF694FDC716122B2E76274BBB2D5FD7D882C7D04DC61DE5EF55911D",
+    "file": "public/H3911.StockMaven3911.psm1"
+  },
+  {
+    "bytes": 35028,
+    "sha256": "DD3BE9386FFED626BE68B499FD22E5CAA0C22AF896251B216D6C348930B0C0EE",
+    "file": "public/H3911.WindowsQualifier.psm1"
+  },
+  {
+    "bytes": 806,
+    "sha256": "55570ECDB6DA448DA8D3C139556E336A1B2CDA1815EFE244E7FA70D95B027E06",
+    "file": "public/Invoke-WindowsQualifier.ps1"
+  },
+  {
+    "bytes": 9001,
+    "sha256": "B8275B17639E33D3678C4D9E57453E325615A2455B32E29A2C18F4B0AC252B10",
+    "file": "public/Make-SyntheticFixtures.py"
+  },
+  {
+    "bytes": 1439,
+    "sha256": "712EFE8B3A60FC7DC29173B1207EB762C9F1DB2C362CE77EBB108027BA94A40C",
+    "file": "public/Observe-KernelCore.ps1"
+  },
+  {
+    "bytes": 52887,
+    "sha256": "63382624DFFEF090C2B47C476767D9BE9F0620296193B650AE419ABE34FC4D0F",
+    "file": "public/StockMaven3911.inventory.json"
+  },
+  {
+    "bytes": 16690,
+    "sha256": "BA44034C8E5D6095FE7A390269C7357E72BF650D2A6509977F7F6B9504FABB19",
+    "file": "public/Test-WindowsQualifier.ps1"
+  }
+]

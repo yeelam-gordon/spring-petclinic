@@ -1,0 +1,79 @@
+# INACTIVE: experiment template only. No registration/allocation or hosted qualification.
+name: INACTIVE Windows ARM PackageScreen
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha: {required: true, type: string}
+      runtime_approved: {required: true, type: boolean, default: false}
+      acknowledgement: {required: true, type: string}
+permissions: {contents: read}
+jobs:
+  screen:
+    if: >-
+      github.event_name == 'workflow_dispatch' && github.run_attempt == '1' &&
+      github.repository == 'yeelam-gordon/spring-petclinic' && github.event.repository.fork == true &&
+      github.repository_owner == github.actor && github.ref == 'refs/heads/perf/arm64-matched-comparison' &&
+      inputs.reviewed_sha == github.sha && inputs.runtime_approved == true &&
+      inputs.acknowledgement == 'I_APPROVE_1_WINDOWS_ARM_PACKAGESCREEN_24_MAX25_1800S_NO_RETRY'
+    environment: matched-comparison-approval
+    runs-on: windows-11-arm
+    timeout-minutes: 40
+    defaults: {run: {shell: pwsh}}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: {ref: '${{ github.sha }}', fetch-depth: 0, persist-credentials: false}
+      - name: Pinned inputs, single request each
+        id: inputs
+        run: |
+          $ErrorActionPreference='Stop'
+          $root=Join-Path $env:SystemDrive "h3911-inputs-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT";New-Item $root -ItemType Directory -ErrorAction Stop|Out-Null
+          foreach($s in @(@('jdk.zip','https://aka.ms/download-jdk/microsoft-jdk-25.0.5.0.2-windows-aarch64.zip','F227CC459FBD65A42C1B28123D68E207EB500899C1C78238F21A038CD33688A3'),@('mvnd.zip','https://github.com/apache/maven-mvnd/releases/download/1.0.3/maven-mvnd-1.0.3-windows-amd64.zip','EFE788E475F8433E855AC05F92E129DC3790517B58002620BA4DD8D264DCD511'))){
+            $file=Join-Path $root $s[0];Invoke-WebRequest $s[1] -OutFile $file -MaximumRetryCount 0;if((Get-FileHash $file).Hash-cne$s[2]){throw 'Pinned archive differs'}
+          }
+          "jdkFile=$(Join-Path $root 'jdk.zip')"|Add-Content $env:GITHUB_OUTPUT
+          "archive=$(Join-Path $root 'mvnd.zip')"|Add-Content $env:GITHUB_OUTPUT
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with: {distribution: jdkfile, jdkFile: '${{ steps.inputs.outputs.jdkFile }}', architecture: aarch64, java-version: '25.0.5', check-latest: false}
+      - name: Exact private portable Core, no image fallback
+        id: core
+        run: |
+          $ErrorActionPreference='Stop'
+          $tools=Join-Path $env:SystemDrive "h3911-core-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT";New-Item $tools -ItemType Directory -ErrorAction Stop|Out-Null
+          $zip=Join-Path $tools 'PowerShell-7.6.9-win-arm64.zip';Invoke-WebRequest 'https://github.com/PowerShell/PowerShell/releases/download/v7.6.9/PowerShell-7.6.9-win-arm64.zip' -OutFile $zip -MaximumRetryCount 0 -MaximumRedirection 5
+          if((Get-FileHash $zip).Hash-cne'2157FB002178E606C2A5532C56647118D90D029742F04D4900A71E3B478C2363'){throw 'Exact portable Core archive differs'}
+          $bundle=Join-Path $tools 'bundle';Expand-Archive -LiteralPath $zip -DestinationPath $bundle -ErrorAction Stop
+          $exe=Join-Path $bundle 'pwsh.exe';[byte[]]$b=[IO.File]::ReadAllBytes($exe)
+          if((Get-FileHash $exe).Hash-cne'BBDF538AEA81C09F60732219B451A26C64F6F2B22BEE05EEECE13DBA909D36E4'-or[BitConverter]::ToUInt16($b,[BitConverter]::ToInt32($b,60)+4)-ne0xAA64){throw 'Exact native Core entry differs'}
+          "exe=$exe"|Add-Content $env:GITHUB_OUTPUT
+      - name: Prepare false flags then explicitly approved single controller
+        env: {MVND_ARCHIVE: '${{ steps.inputs.outputs.archive }}', CORE_EXE: '${{ steps.core.outputs.exe }}'}
+        run: |
+          $ErrorActionPreference='Stop';$PSNativeCommandUseErrorActionPreference=$false
+          $p=Join-Path $env:GITHUB_WORKSPACE 'Generated Files/java-arm-build-optimization/experiments/hobl-maven3911-windows-hosted-screen-isolated-r3'
+          $root=Join-Path $env:SystemDrive "h3911-screen-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          & $env:CORE_EXE -NoProfile -NonInteractive -File (Join-Path $p 'New-HostedStage.ps1') -Root $root -RepositorySource $env:GITHUB_WORKSPACE -Jdk $env:JAVA_HOME -DistributionArchive $env:MVND_ARCHIVE -CoreExe $env:CORE_EXE -WatchRoot $env:GITHUB_WORKSPACE
+          if($LASTEXITCODE-ne0){throw 'Private native Core stage construction failed'}
+          $stage=Join-Path $root 'controller/stage.json';$s=Get-Content $stage -Raw|ConvertFrom-Json -AsHashtable
+          $opts=[Environment]::GetEnvironmentVariable('MAVEN_OPTS');$present=Test-Path Env:MAVEN_OPTS
+          if($opts-and$opts-cne'-Xms256m'){throw 'Unreviewed image MAVEN_OPTS; no normalization'}
+          try{
+            $s.launcherReview.approved=$true;$s.runtimeAllocation.approved=$true;$s.runtimeAllocation.status='ROOT_ALLOCATED_EXACT_RUN';$s|ConvertTo-Json -Depth 10|Set-Content $stage
+            if($opts-ceq'-Xms256m'){Remove-Item Env:MAVEN_OPTS}
+            & $env:CORE_EXE -NoProfile -NonInteractive -File (Join-Path $root 'controller/Supervise-StagedQualifier.ps1') -ExecutionApproved
+            if($LASTEXITCODE-ne0){throw 'Native cohort not qualified; no retry'}
+          }finally{
+            if($present){[Environment]::SetEnvironmentVariable('MAVEN_OPTS',$opts,'Process')}else{Remove-Item Env:MAVEN_OPTS -ErrorAction SilentlyContinue}
+            $s.runtimeAllocation.approved=$false;$s.runtimeAllocation.status='CONSUMED_NO_RETRY';$s|ConvertTo-Json -Depth 10|Set-Content $stage
+          }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: windows-packagescreen-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            C:/h3911-screen-${{ github.run_id }}-${{ github.run_attempt }}/controller/actual-supervision
+            C:/h3911-screen-${{ github.run_id }}-${{ github.run_attempt }}/controller/stage.json
+            C:/h3911-screen-${{ github.run_id }}-${{ github.run_attempt }}/run/output
+            C:/h3911-screen-${{ github.run_id }}-${{ github.run_attempt }}/run/qualifier.json
+            C:/h3911-screen-${{ github.run_id }}-${{ github.run_attempt }}/preparation.json
+          if-no-files-found: warn
+          retention-days: 14

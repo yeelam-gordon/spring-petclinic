@@ -1,0 +1,1 @@
+LOCAL/UNRELEASED supplemental1.0.3 Windows ARM64 JNI resource, compiled unchanged Apache stock C. NOT an official Windows ARM64 distribution. Original AMD64 frontend untouched; future qualification uses MVND_CLIENT=jvm with nativeJDK25 only after separate authorization. Original licenses retained; original native JAR backup outside classpath.
