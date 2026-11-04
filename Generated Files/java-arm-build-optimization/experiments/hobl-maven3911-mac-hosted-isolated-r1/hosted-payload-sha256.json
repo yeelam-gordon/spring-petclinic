@@ -1,0 +1,142 @@
+[
+  {
+    "bytes": 9,
+    "sha256": "8B9C3028D6467FF3BE7C793141927841D70F47F52D0590677438F488CA154992",
+    "file": ".gitattributes"
+  },
+  {
+    "bytes": 26328,
+    "sha256": "3CE4643DB4468AED808DA9BC423B74E60F7FB5F705B63AC8F7DE4D9B4F71A6E4",
+    "file": "H3911.MacHosted.psm1"
+  },
+  {
+    "bytes": 10313,
+    "sha256": "234B498F3BF14EAFCE11721D0992CD3B589F26CF9704F48DAE534EB2FCB7FFCD",
+    "file": "mac-qualification.workflow.yml"
+  },
+  {
+    "bytes": 3392,
+    "sha256": "DCACCB0D8A62EDA33B41EF177AC2D7FE8F68C01AC954BDF6A43934EAC88BA8DF",
+    "file": "runtime-pins.json"
+  },
+  {
+    "bytes": 29822,
+    "sha256": "45D9AA3DD7923358A576647F07AAC8D39617A9C9AEA4FBC33C1BA9664E42BCA3",
+    "file": "runtime/Darwin103.inventory.json"
+  },
+  {
+    "bytes": 10571,
+    "sha256": "BD2B01750B3F6954425599F0E70F34F2A04B122E03724B1482704E76FC6B55F6",
+    "file": "runtime/H3911.Artifacts.psm1"
+  },
+  {
+    "bytes": 19043,
+    "sha256": "14D87CEFF68D26689C4A05D56BF503C75F8C95942ED4685538738FAD8FB9FE9F",
+    "file": "runtime/H3911.CallKernel.psm1"
+  },
+  {
+    "bytes": 5095,
+    "sha256": "05F80C9435B3E6012FAE8874A887A7F96AF8B44311EC1D4A06265ED254E7A264",
+    "file": "runtime/H3911.Darwin103.psm1"
+  },
+  {
+    "bytes": 14765,
+    "sha256": "E676EE877FBDF3E3823EE7B7085C2BB083161ADBCAFFBA644B736CFEADDFAFF2",
+    "file": "runtime/H3911.DarwinLifecycle.psm1"
+  },
+  {
+    "bytes": 12727,
+    "sha256": "E9A8FD932AC839119FDD0B810533E8FB69BA314CB038E7345C484A7988A36E1E",
+    "file": "runtime/H3911.DarwinOwner.psm1"
+  },
+  {
+    "bytes": 10572,
+    "sha256": "7943C480E2E73F68554BBE46A30811F54A299EBDBA5FDF7F0A430314EEF12D57",
+    "file": "runtime/H3911.DistributionSetup.psm1"
+  },
+  {
+    "bytes": 13767,
+    "sha256": "AA208B30F94342541C741E60A94F84A94E3DA3CC0F8C5D236EAC9D4A34267397",
+    "file": "runtime/H3911.EffectiveOwner.psm1"
+  },
+  {
+    "bytes": 7087,
+    "sha256": "1F1C0099CDC1A7DA6FE949BF973269418DCAAC0E1539A4598A6E5CCFE3720BAA",
+    "file": "runtime/H3911.Helpers.psm1"
+  },
+  {
+    "bytes": 22302,
+    "sha256": "DD309FE9C6E3C5B115BE8D1DBA045CE2E046FD840237AB97A66ABF45CEAC53C6",
+    "file": "runtime/H3911.MacQualifier.psm1"
+  },
+  {
+    "bytes": 23140,
+    "sha256": "B3FE0AE0CB9D6BDAFF87552A7A001F2758ED5984C525274A00515867343382F9",
+    "file": "runtime/H3911.MacSupervisor.psm1"
+  },
+  {
+    "bytes": 6501,
+    "sha256": "6CF9CB37879428520B87738FE8A0CDECEA8E0B6AA6577C068FDABB44F038E5A3",
+    "file": "runtime/H3911.NativeProcess.psm1"
+  },
+  {
+    "bytes": 7975,
+    "sha256": "6AC4B84BEEDEED24E6330D556BFAA2954CA2D4771880F2A0C2602AEF5B91A1C0",
+    "file": "runtime/H3911.Source.psm1"
+  },
+  {
+    "bytes": 5544,
+    "sha256": "3D8DCF80AFF694FDC716122B2E76274BBB2D5FD7D882C7D04DC61DE5EF55911D",
+    "file": "runtime/H3911.StockMaven3911.psm1"
+  },
+  {
+    "bytes": 24381,
+    "sha256": "8A2586114254F8F338BB4B64907FA2CAE01CB79F2577FFC23ED0E17F533CBA01",
+    "file": "runtime/H3911.WindowsQualifier.psm1"
+  },
+  {
+    "bytes": 465,
+    "sha256": "64CF2706B674ABB81EE7E157B562AC7FF9F7ED90CA77CCE057BE2BB81051DEC7",
+    "file": "runtime/Invoke-MacQualifier.ps1"
+  },
+  {
+    "bytes": 3610,
+    "sha256": "E90C35656859302224A070CA00A49223FDF8EDE90D4B26BBADDD9108B837D2AD",
+    "file": "runtime/Invoke-MacSupervisedChild.ps1"
+  },
+  {
+    "bytes": 858,
+    "sha256": "93FADE9D19CC6AAC7FA0BF841A61139FF9CF49BAAB6A24583B14BEA488F868D1",
+    "file": "runtime/Invoke-MacSupervisor.ps1"
+  },
+  {
+    "bytes": 3635,
+    "sha256": "B4C08E1980A986419E9B402E9DF2B8DBA2C800E62E20995B1C9420EBE031678E",
+    "file": "runtime/mac-jdk25-identity.json"
+  },
+  {
+    "bytes": 2770,
+    "sha256": "FDDBD680E4708F0321EEFF5B969EC9F3DAF5AD3D240477219EDA3EA975E2E06F",
+    "file": "runtime/mac-qualifier-sha256.json"
+  },
+  {
+    "bytes": 52887,
+    "sha256": "63382624DFFEF090C2B47C476767D9BE9F0620296193B650AE419ABE34FC4D0F",
+    "file": "runtime/StockMaven3911.inventory.json"
+  },
+  {
+    "bytes": 8680,
+    "sha256": "69B1A97D4F9FF32080C48DF933309D955D7A0B40327891ED8EFC8A999913F66A",
+    "file": "runtime/Test-MacQualifier.ps1"
+  },
+  {
+    "bytes": 7200,
+    "sha256": "2A430AB424DBA8FFA0BB2D8EE14CC5EEE7EE7C0F409D0A37D721B1CE9A9804D7",
+    "file": "Test-MacHosted.ps1"
+  },
+  {
+    "bytes": 4940,
+    "sha256": "C59F6E8668EF6ABA6FC6C36090C3118C0CB4EF138B206C8357A7A229E28C5024",
+    "file": "Test-MacRetentionBoundaries.ps1"
+  }
+]
