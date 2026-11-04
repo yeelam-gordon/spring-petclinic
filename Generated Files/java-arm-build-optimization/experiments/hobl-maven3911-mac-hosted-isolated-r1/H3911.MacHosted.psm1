@@ -33,7 +33,7 @@ function Get-HostedSourcePolicy {
 function Assert-H3911MacHostedSource([string]$SourceRoot){
     foreach($row in (& ${function:Get-HostedSourcePolicy})){$file=& ${function:Get-HostedRegular} $SourceRoot $row.file;& ${function:Assert-Hosted} ($file.Length-eq$row.bytes-and(Microsoft.PowerShell.Utility\Get-FileHash $file.FullName).Hash-ceq$row.sha256) 'All runtime/control source byte pins required'}
     $pins=Join-Path $SourceRoot 'runtime-pins.json'
-    & ${function:Assert-Hosted} ((Microsoft.PowerShell.Utility\Get-FileHash $pins).Hash-ceq'42CBE9D934BB539F8559F21D519C197F65FF5BFD46FEB93B8E6EDA76EFE88C91') 'Closed hosted runtime manifest differs'
+    & ${function:Assert-Hosted} ((Microsoft.PowerShell.Utility\Get-FileHash $pins).Hash-ceq'85893CE27CA4DDCEAEC31529052FD61425E9FB541D1E15F227512A1E444775F0') 'Closed hosted runtime manifest differs'
     $rows=Get-Content $pins -Raw|ConvertFrom-Json -AsHashtable -DateKind String
     & ${function:Assert-Hosted} ($rows.Count-eq22) 'Exact required runtime/source-identity closure required'
     foreach($row in $rows){
@@ -101,6 +101,18 @@ function Copy-HostedBoundCaptureFile([string]$Root,[string]$Relative,[string]$De
     Copy-Item -LiteralPath $file.FullName -Destination $Destination
     & ${function:Assert-Hosted} ((Microsoft.PowerShell.Utility\Get-FileHash $Destination).Hash-ceq$ExpectedSha256) 'Copied capture differs from producer digest'
 }
+function Assert-HostedSuiteReport([string]$Root,[IO.FileInfo]$Report,$Artifact){
+    $file=& ${function:Get-HostedRegular} $Root ('surefire/'+$Report.Name)
+    & ${function:Assert-Hosted} ($file.FullName-ceq$Report.FullName-and$Report.Name.StartsWith('TEST-',[StringComparison]::Ordinal)-and$Report.Extension-ceq'.xml') 'Bound suite report file required'
+    $suite=$Report.BaseName.Substring(5)
+    $compiled=@($Artifact.loose|Where-Object {$_.scope-ceq'test-classes'-and$_.name-ceq($suite.Replace('.','/')+'.class')})
+    & ${function:Assert-Hosted} ($compiled.Count-eq1) 'Unknown compiled suite identity'
+    $class=& ${function:Get-HostedRegular} $Root ('test-classes/'+$compiled[0].name)
+    & ${function:Assert-Hosted} ($class.Length-eq$compiled[0].bytes-and(Microsoft.PowerShell.Utility\Get-FileHash $class.FullName).Hash-ceq$compiled[0].sha256) 'Compiled suite byte binding differs'
+    $xml=[xml](Get-Content $file.FullName -Raw)
+    $node=$xml.SelectSingleNode('/testsuite')
+    & ${function:Assert-Hosted} ($node-and$node.GetAttribute('name')-ceq$suite) 'Suite XML identity differs'
+}
 function Get-HostedCaptureBinding([string]$SourceRoot,[string]$RunRoot,[string]$Phase){
     $relative='qualification/output/'+$Phase;$dir=Join-Path $RunRoot $relative
     $members=@(Get-Item -LiteralPath $dir -Force)+@(Get-ChildItem -LiteralPath $dir -Recurse -Force)
@@ -123,8 +135,7 @@ function Get-HostedCaptureBinding([string]$SourceRoot,[string]$RunRoot,[string]$
     foreach($file in $reportFiles){$reports+=,[xml](Get-Content $file.FullName -Raw)}
     $tests=& ($h.ExportedCommands['TestKeys']) $reports
     & ${function:Assert-Hosted} ($tests.Count-eq56-and@($tests|Where-Object state -eq passed).Count-eq54-and@($tests|Where-Object state -eq skipped).Count-eq2-and($tests|ConvertTo-Json -Depth 40 -Compress)-ceq($phaseRecord.tests|ConvertTo-Json -Depth 40 -Compress)) 'Surefire membership/state binding differs'
-    $classes=@($tests.class|Sort-Object -Unique)
-    foreach($file in $reportFiles){& ${function:Assert-Hosted} ($file.Name-cin@($classes|ForEach-Object{'TEST-'+$_+'.xml'})) 'Unknown report member'}
+    foreach($file in $reportFiles){& ${function:Assert-HostedSuiteReport} $dir $file $artifact}
     $xml=[xml](Get-Content (Join-Path $dir 'jacoco/jacoco.xml') -Raw);$counters=& ($h.ExportedCommands['CoverageKeys']) $xml;$semantics=& ($h.ExportedCommands['CoverageSemantics']) $xml
     & ${function:Assert-Hosted} ($counters.Count-eq726-and$phaseRecord.counters-is[Collections.IDictionary]-and$phaseRecord.counters.Count-eq726-and$semantics-ceq$phaseRecord.semantics) 'Coverage report binding differs'
     foreach($key in $counters.Keys){& ${function:Assert-Hosted} ($key-cin@($phaseRecord.counters.Keys)-and$counters[$key]-ceq$phaseRecord.counters[$key]) 'Coverage counter identity/value differs'}

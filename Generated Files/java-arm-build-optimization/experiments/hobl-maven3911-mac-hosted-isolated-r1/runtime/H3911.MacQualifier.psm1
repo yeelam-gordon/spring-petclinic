@@ -41,13 +41,14 @@ function Import-MQ {
         'H3911.Darwin103.psm1'=@('05F80C9435B3E6012FAE8874A887A7F96AF8B44311EC1D4A06265ED254E7A264',@('Assert-H3911Darwin103Distribution'))
         'H3911.StockMaven3911.psm1'=@('3D8DCF80AFF694FDC716122B2E76274BBB2D5FD7D882C7D04DC61DE5EF55911D',@('Assert-H3911StockMaven3911'))
         'H3911.EffectiveOwner.psm1'=@('4979E2E0160A6DCF9C7B13E279DA712F047634AABB7F3CB021C2A25578CF7B95',@('Read-H3911DarwinEffectiveOwner'))
-        'H3911.DarwinLifecycle.psm1'=@('E676EE877FBDF3E3823EE7B7085C2BB083161ADBCAFFBA644B736CFEADDFAFF2',@('New-H3911DarwinPrivateStopPlan','Confirm-H3911DarwinCliStop'))}
+        'H3911.DarwinLifecycle.psm1'=@('AD420580D1F4E98350ADF94102BE43C96EEF9A5CC3086DC5C0F33DB493C5E66A',@('New-H3911DarwinPrivateStopPlan','Confirm-H3911DarwinCliStop','Read-H3911DarwinScopedCensus'))}
     $bound=@{}
     foreach($row in $spec.GetEnumerator()){
         $path=Join-Path $PSScriptRoot $row.Key
         & ${function:Assert-MQ} ((Microsoft.PowerShell.Utility\Get-FileHash -LiteralPath $path).Hash-ceq$row.Value[0]) 'Mac dependency pin differs'
         $m=Import-Module $path -Scope Local -PassThru -DisableNameChecking
         foreach($name in $row.Value[1]){$command=$m.ExportedCommands[$name];& ${function:Assert-MQ} ($command-is[Management.Automation.FunctionInfo]-and$command.Module.Path-ceq$path-and$command.Name-ceq$name) 'Mac command object origin differs';$bound[$name]=$command}
+        if($row.Key-ceq'H3911.DarwinLifecycle.psm1'){$same=& $m {Get-Command Test-LifeSame -CommandType Function};& ${function:Assert-MQ} ($same-is[Management.Automation.FunctionInfo]-and$same.Module.Path-ceq$path-and$same.Name-ceq'Test-LifeSame') 'Lifecycle identity comparison origin differs';$bound['Test-LifeSame']=$same}
     }
     $bound
 }
@@ -85,6 +86,21 @@ function Read-MQOwner($C,$Commands,$Hooks){
 function Assert-MQSame($A,$B){
     foreach($key in 'pid','created','daemonId','home','registryFile','executable','jniPath'){& ${function:Assert-MQ} ($A[$key]-ceq$B[$key]) 'Mac owner identity changed'}
 }
+function Assert-MQEarlyCensus($C,$Anchor,$Census,$Commands){
+    $scope='all admitted-JDK Java plus explicitly tracked PID/create identities; not universal historical descendants'
+    & ${function:Assert-MQ} ($Census-is[hashtable]-and$Census.schema-is[string]-and$Census.schema-ceq'darwin-scoped-java-census-v1'-and$Census.complete-is[bool]-and$Census.complete-and$Census.errors-is[array]-and$Census.errors.Count-eq0-and$Census.scope-is[string]-and$Census.scope-ceq$scope-and$Census.jdkExecutable-is[string]-and$Census.jdkExecutable-ceq(Join-Path $C.Jdk 'bin/java')-and$Census.expectedIdentityGone-is[bool]-and-not$Census.expectedIdentityGone) 'Early scoped census incomplete/foreign/owner absent'
+    & ${function:Assert-MQ} ($C.KnownOwnedIdentities-is[array]-and$Census.tracked-is[array]-and$Census.tracked.Count-eq(1+$C.KnownOwnedIdentities.Count)-and$Census.sameJdkJava-is[array]-and$Census.sameJdkJava.Count-eq1-and$Census.knownLive-is[array]-and$Census.knownLive.Count-eq1) 'Early scoped census tracked/live set differs'
+    $wanted=@($Anchor)+@($C.KnownOwnedIdentities);$seen=[Collections.Generic.HashSet[int]]::new()
+    foreach($identity in @($wanted)+@($Census.tracked)+@($Census.sameJdkJava)+@($Census.knownLive)){
+        & ${function:Assert-MQ} ($identity-is[hashtable]-and($identity.pid-is[int]-or$identity.pid-is[long])-and$identity.pid-gt0-and$identity.pid-le[int]::MaxValue-and$identity.created-is[string]-and$identity.created-cmatch'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,7})?(?:Z|[+-]\d\d:\d\d)$'-and$identity.executable-is[string]-and$identity.executable.Length-gt0) 'Early census typed identity required'
+    }
+    for($i=0;$i-lt$wanted.Count;$i++){
+        & ${function:Assert-MQ} ($seen.Add([int]$Census.tracked[$i].pid)-and(& ($Commands['Test-LifeSame']) $wanted[$i] $Census.tracked[$i])) 'Early tracked PID/birth/executable differs'
+    }
+    foreach($key in 'daemonId','home','registryFile','jniPath'){& ${function:Assert-MQ} ($Census.tracked[0][$key]-is[string]-and$Census.tracked[0][$key]-ceq$Anchor[$key]) 'Early tracked owner scope differs'}
+    foreach($identity in $Census.sameJdkJava[0],$Census.knownLive[0]){& ${function:Assert-MQ} (& ($Commands['Test-LifeSame']) $Anchor $identity) 'Early live owner reused/foreign'}
+    @{status='COMPLETE_OWNED_RUNNING_SCOPE_CONFIRMED';complete=$true;scope=$scope;ownerPid=$Anchor.pid;trackedCount=$Census.tracked.Count;sameJdkCount=1;knownLiveCount=1;errors=0;ownerLive=$true;absenceAsserted=$false;afterCall='daemon-project';beforeCall='baseline-maven-home';fixtureOnly=$C.FixtureOnly}
+}
 function Stop-MQ($C,$Commands,$Anchor,$Hooks,[switch]$Emergency){
     if(-not$Emergency){$null=& ($Commands['Assert-H3911Source']) $C;if(-not$C.FixtureOnly){$null=& ($Commands['Assert-H3911Darwin103Distribution']) $C.Home -RequireNativeModes}}
     if($C.FixtureOnly){$owner=& ${function:Read-MQOwner} $C $Commands $Hooks;& ${function:Assert-MQSame} $owner $Anchor;$plan=& $Hooks.StopPlan $C $Anchor ([bool]$Emergency)}
@@ -107,7 +123,7 @@ function Invoke-H3911MacQualifier {
     & ${function:Assert-MQDisjoint} $Project $Owned
     foreach($path in @($Jdk,$JdkArchive,$DistributionArchive)|Where-Object{$_}){$physical=& ${function:Resolve-MQPath} $path;& ${function:Assert-MQDisjoint} $Project $physical;& ${function:Assert-MQDisjoint} $Owned $physical}
     & ${function:Assert-MQ} (-not(Test-Path -LiteralPath $Owned)) 'Fresh Mac owned root required'
-    if($FixtureOnly){foreach($key in 'Setup','Dispatch','Owner','Stock','Verify','Compare','StopPlan','Stop','Confirm'){& ${function:Assert-MQ} ($FixtureHooks[$key]-is[scriptblock]) 'Complete explicit Mac fixture hooks required'}}
+    if($FixtureOnly){foreach($key in 'Setup','Dispatch','Owner','Census','Stock','Verify','Compare','StopPlan','Stop','Confirm'){& ${function:Assert-MQ} ($FixtureHooks[$key]-is[scriptblock]) 'Complete explicit Mac fixture hooks required'}}
     $commands=& ${function:Import-MQ}
     & ${function:Assert-MQ} ((Microsoft.PowerShell.Utility\Get-FileHash (Join-Path $PSScriptRoot 'mac-jdk25-identity.json')).Hash-ceq'B4C08E1980A986419E9B402E9DF2B8DBA2C800E62E20995B1C9420EBE031678E') 'Trusted Mac JDK manifest differs'
     $names=@('JAVA_HOME','PATH','MAVEN_USER_HOME','MAVEN_OPTS','MAVEN_ARGS','JAVA_TOOL_OPTIONS','JDK_JAVA_OPTIONS','_JAVA_OPTIONS','MAVEN_SKIP_RC','JAVACMD','MVNW_PREFER_PWSH','MVND_CLIENT','MVND_HOME','MVND_DAEMON_STORAGE','MVND_OPTS','MVND_JVM_ARGS','TMP','TEMP','TMPDIR')
@@ -169,6 +185,11 @@ function Invoke-H3911MacQualifier {
                     }
                 }
                 if($label-ceq'daemon-arch'){$anchor=& ${function:Read-MQOwner} $c $commands $FixtureHooks}
+                if($label-ceq'daemon-project'){
+                    $record.earlyCensus=@{status='HOLD';afterCall=$label;beforeCall='baseline-maven-home';absenceAsserted=$false;fixtureOnly=[bool]$FixtureOnly}
+                    $visibility=if($FixtureOnly){& $FixtureHooks.Census $c $anchor}else{& ($commands['Read-H3911DarwinScopedCensus']) -Context $c -Expected $anchor -RuntimeApproved}
+                    $record.earlyCensus=& ${function:Assert-MQEarlyCensus} $c $anchor $visibility $commands
+                }
             }
             $record.stopProof=& ${function:Stop-MQ} $c $commands $anchor $FixtureHooks
             & ${function:Assert-MQ} ($c.Calls.Count-eq8) 'Complete eight client calls required';$normal=$true;$record.status=if($FixtureOnly){'MAC_FIXTURE_ONLY_COMPLETE'}else{'MAC_UNTIMED_COMPLETE_PENDING_AUDIT'}

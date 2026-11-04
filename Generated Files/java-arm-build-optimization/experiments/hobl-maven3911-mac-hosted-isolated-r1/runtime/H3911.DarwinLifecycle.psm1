@@ -65,17 +65,34 @@ function Confirm-H3911DarwinAbsenceFacts {
 }
 function Get-LifeOsProcesses {
     $rows=@()
-    try{$all=[Diagnostics.Process]::GetProcesses()}catch{throw 'HOLD: full native process enumeration failed'}
+    try{$all=[Diagnostics.Process]::GetProcesses()}catch{throw 'HOLD: full native process enumeration failed [reason=CENSUS_ENUMERATION_FAILED;phase=enumerate;pid=unavailable;scanComplete=false]'}
     foreach($p in $all){
-        try{$rows+=,@{pid=$p.Id;created=$p.StartTime.ToUniversalTime().ToString('o');executable=$p.MainModule.FileName};Assert-LifeIdentity $rows[-1]}
-        catch{throw 'HOLD: unreadable/exited/ambiguous native process identity during full census'}
-        finally{$p.Dispose()}
+        $phase='pid';$pidText='unavailable';$failed=$false
+        try{
+            $id=$p.Id;if($null-eq$id){throw 'Unavailable PID value'}
+            if(($id-is[int]-or$id-is[long]-or$id-is[uint32])-and$id-gt0-and$id-le[int]::MaxValue){$pidText=$id.ToString([Globalization.CultureInfo]::InvariantCulture)}
+            $phase='start-time';$created=$p.StartTime.ToUniversalTime().ToString('o')
+            $phase='main-module';$module=$p.MainModule;if($null-eq$module){throw 'Unavailable module value'}
+            $phase='module-file-name';$executable=$module.FileName;if($null-eq$executable){throw 'Unavailable executable value'}
+            $phase='identity';$rows+=,@{pid=$id;created=$created;executable=$executable};Assert-LifeIdentity $rows[-1]
+        }
+        catch{$failed=$true;throw ('HOLD: unreadable/exited/ambiguous native process identity during full census [reason=CENSUS_ROW_FAILED;phase='+$phase+';pid='+$pidText+';scanComplete=false]')}
+        finally{try{$p.Dispose()}catch{if(-not$failed){throw ('HOLD: native process disposal failed [reason=CENSUS_DISPOSE_FAILED;phase=dispose;pid='+$pidText+';scanComplete=false]')}}}
     }
     @{complete=$true;errors=@();processes=$rows}
 }
 function Get-LifeCurrent([int]$ProcessId){
-    try{$p=[Diagnostics.Process]::GetProcessById($ProcessId)}catch{throw 'HOLD: native identity missing/unavailable before stop admission'}
-    try{$r=@{pid=$p.Id;created=$p.StartTime.ToUniversalTime().ToString('o');executable=$p.MainModule.FileName};Assert-LifeIdentity $r;$r}finally{$p.Dispose()}
+    $pidText=if($ProcessId-gt0){$ProcessId.ToString([Globalization.CultureInfo]::InvariantCulture)}else{'unavailable'}
+    try{$p=[Diagnostics.Process]::GetProcessById($ProcessId)}catch{throw ('HOLD: native identity missing/unavailable before stop admission [reason=CURRENT_LOOKUP_FAILED;phase=lookup;pid='+$pidText+';scanComplete=false]')}
+    $phase='pid';$failed=$false
+    try{
+        $id=$p.Id;if($null-eq$id){throw 'Unavailable PID value'}
+        $phase='start-time';$created=$p.StartTime.ToUniversalTime().ToString('o')
+        $phase='main-module';$module=$p.MainModule;if($null-eq$module){throw 'Unavailable module value'}
+        $phase='module-file-name';$executable=$module.FileName;if($null-eq$executable){throw 'Unavailable executable value'}
+        $phase='identity';$r=@{pid=$id;created=$created;executable=$executable};Assert-LifeIdentity $r;$r
+    }catch{$failed=$true;throw ('HOLD: native identity read failed before stop admission [reason=CURRENT_IDENTITY_FAILED;phase='+$phase+';pid='+$pidText+';scanComplete=false]')}
+    finally{try{$p.Dispose()}catch{if(-not$failed){throw ('HOLD: native process disposal failed [reason=CURRENT_DISPOSE_FAILED;phase=dispose;pid='+$pidText+';scanComplete=false]')}}}
 }
 function Assert-LifeNativePaths($Context){
     foreach($path in $Context.Jdk,$Context.Home,$Context.Registry,$Context.Temp){

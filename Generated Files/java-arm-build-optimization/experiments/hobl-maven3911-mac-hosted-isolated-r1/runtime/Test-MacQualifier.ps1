@@ -48,18 +48,35 @@ function CheckModel([string]$Case,[string]$HomeState='absent',[switch]$Aliases){
             0
         }.GetNewClosure()
         Owner={param($c)$state.reads++;if($state.alive){@{pid=$(if($state.case-eq'pid-change'-and$state.reads-gt1){23456}else{12345});created='2026-01-01T00:00:00Z';daemonId=$(if($state.case-eq'id-fail'){'invalid'}else{'01234567'});home=$c.Home;registryFile=$(if($state.case-eq'registry-fail'){'FOREIGN'}else{Join-Path $c.Registry 'registry.bin'});executable=(Join-Path $c.Jdk 'bin/java');jniPath=(Join-Path $c.Temp 'MODEL.jnilib');evidenceKind='MODEL_NOT_NATIVE_MAC'}}}.GetNewClosure()
+        Census={param($c,$anchor)
+            if($state.case-in@('early-hold','early-hold-cleanup-fail')){throw 'HOLD: unreadable/exited/ambiguous native process identity during full census [reason=CENSUS_ROW_FAILED;phase=main-module;pid=42;scanComplete=false]'}
+            if($state.case-eq'early-missing'){return $null}
+            $tracked=@{};foreach($p in $anchor.GetEnumerator()){$tracked[$p.Key]=$p.Value}
+            $live=@{pid=$anchor.pid;created=$anchor.created;executable=$anchor.executable}
+            $census=@{schema='darwin-scoped-java-census-v1';complete=$true;errors=@();scope='all admitted-JDK Java plus explicitly tracked PID/create identities; not universal historical descendants';jdkExecutable=(Join-Path $c.Jdk 'bin/java');expectedIdentityGone=$false;tracked=@($tracked);sameJdkJava=@($live);knownLive=@($live);evidenceKind='validated-census-model'}
+            switch($state.case){
+                early-schema{$census.schema='WRONG'}
+                early-types{$census.complete='true'}
+                early-tracked{$tracked.registryFile='FOREIGN'}
+                early-time{$live.created='not-a-time'}
+                early-reused{$live.created='2026-01-01T00:00:01Z'}
+                early-foreign{$live.executable='FOREIGN'}
+                positive-offset{$live.created='2026-01-01T08:00:00.0000000+08:00';$tracked.created='2026-01-01T00:00:00.0000000Z'}
+            }
+            $census
+        }.GetNewClosure()
         Stock={param($c,$root)@{status='FULL_TRUSTED_STOCK_MAVEN3911_ADMITTED';archiveFiles=$(if($state.case-eq'stock-fail'){1}else{96});physicalFiles=97;directories=13;inventorySha256='63382624DFFEF090C2B47C476767D9BE9F0620296193B650AE419ABE34FC4D0F';archiveFormat=$(if($state.case-eq'positive-tar'){'Tar'}else{'Zip'});fixtureOnly=$true}}.GetNewClosure()
         Verify={param($c,$label,$call)@{tests=@(1..$(if($state.case-eq'fidelity-fail'){55}else{56}));counters=@(1..726);semantics='MODEL_ONLY';fork=$label;session=$label;artifact='NO_COMPILED_ARTIFACT'}}.GetNewClosure()
         Compare={param($c)$true}
         StopPlan={param($c,$anchor,$emergency)@{exe=(Join-Path $c.Home 'bin/mvnd');tokens=@("-Dmvnd.daemonStorage=$($c.Registry)","-Dmvnd.registry=$($anchor.registryFile)","-Djava.home=$($c.Jdk)",'--stop');workingDirectory=$c.Temp;expectedPid=$anchor.pid;expectedCreated=$anchor.created;fixtureOnly=$true}}
-        Stop={param($c,$p)$state.stops++;if($state.case-eq'stop-fail'-and$state.stops-eq1){1}else{$state.alive=$false;0}}.GetNewClosure()
-        Confirm={param($c,$anchor,$exit,$emergency)if($state.alive){throw 'MODEL census survivor'};@{status=$(if($emergency){'FAIL_NONZERO_FORCED_OR_EMERGENCY'}else{'NORMAL_CLI_ROUTE_SCOPED_ABSENCE_CONFIRMED'});fixtureOnly=$true}}.GetNewClosure()
+        Stop={param($c,$p)$state.stops++;if(($state.case-eq'stop-fail'-and$state.stops-eq1)-or$state.case-eq'early-hold-cleanup-fail'){1}else{$state.alive=$false;0}}.GetNewClosure()
+        Confirm={param($c,$anchor,$exit,$emergency)if($state.alive){throw 'MODEL census survivor'};if($state.case-eq'post-census-fail'){throw 'MODEL_POST_STOP_COMPLETE_CENSUS_HOLD'};@{status=$(if($emergency){'FAIL_NONZERO_FORCED_OR_EMERGENCY'}else{'NORMAL_CLI_ROUTE_SCOPED_ABSENCE_CONFIRMED'});fixtureOnly=$true}}.GetNewClosure()
     }
     $helper=Import-Module (Join-Path $PSScriptRoot 'H3911.Helpers.psm1') -PassThru -Scope Local -DisableNameChecking
     $snapshot=$helper.ExportedCommands['PortableEnvironmentSnapshot'];$restore=$helper.ExportedCommands['RestorePortableEnvironment'];$saved=& $snapshot
     switch($HomeState){absent{Remove-Item Env:JAVA_HOME -ErrorAction SilentlyContinue}empty{[Environment]::SetEnvironmentVariable('JAVA_HOME','','Process')}value{$env:JAVA_HOME='MODEL_CALLER'}}
     $before=& $snapshot;$cwd=(Get-Location).Path;$native=[Environment]::CurrentDirectory;$errorText=$null
-    $names=@('Assert-MQ','Import-MQ','Resolve-MQPath','Assert-MQDisjoint','Get-MQWatch','Read-MQOwner','Assert-MQSame','Stop-MQ')
+    $names=@('Assert-MQ','Import-MQ','Resolve-MQPath','Assert-MQDisjoint','Get-MQWatch','Read-MQOwner','Assert-MQSame','Assert-MQEarlyCensus','Stop-MQ')
     if($Aliases){foreach($n in $names){Set-Alias -Name $n -Value Out-Null -Scope Global}}
     try{$result=& $invoke -Project $project -Jdk $jdk -Owned $owned -WatchRoot $RepositorySource -FixtureOnly -FixtureHooks $hooks}catch{$errorText=$_.Exception.Message}
     finally{
@@ -72,10 +89,16 @@ function CheckModel([string]$Case,[string]$HomeState='absent',[switch]$Aliases){
     if($Case-like'positive*'){
         $labels=@($receipt.calls|ForEach-Object{if($_.plan){$_.plan.label}else{$_.label}})
         if($errorText-or$receipt.status-cne'MAC_FIXTURE_ONLY_COMPLETE'-or$state.alive-or$state.stops-ne1-or($labels-join',')-cne'baseline-project,daemon-arch,daemon-home,daemon-project,baseline-maven-home,baseline-verify,candidate-verify,normal-stop'){throw "Mac complete eight-call model failed: $errorText"}
+        if($receipt.earlyCensus.status-cne'COMPLETE_OWNED_RUNNING_SCOPE_CONFIRMED'-or$receipt.earlyCensus.absenceAsserted-or-not$receipt.earlyCensus.ownerLive){throw 'Early live-scope gate was absent or asserted absence'}
     }else{
         if(-not$errorText-or$receipt.status-cne'FAIL'){throw "Mac negative model accepted $Case"}
         if($Case-in@('pid-change','id-fail','registry-fail')){if(-not$receipt.cleanupFailure-or$state.stops){throw 'Ambiguous owner cleanup was not held'}}
+        elseif($Case-eq'early-hold-cleanup-fail'){if(-not$receipt.cleanupFailure-or$errorText-notmatch'CENSUS_ROW_FAILED;phase=main-module;pid=42;scanComplete=false'){throw 'Cleanup failure masked original fixed diagnostic'}}
         elseif($state.alive){throw 'Mac admitted cleanup missed modeled owner'}
+        if($Case-like'early-*'){
+            if($receipt.calls.Count-ne5-or@($receipt.calls|Where-Object {$_.plan.label-like'*-verify'}).Count-or$state.stops-ne1){throw 'Early visibility hold crossed build boundary or missed one safe stop'}
+        }
+        if($Case-eq'post-census-fail'-and($receipt.calls.Count-ne8-or$errorText-notmatch'MODEL_POST_STOP_COMPLETE_CENSUS_HOLD')){throw 'Early preflight replaced mandatory post-stop census'}
         if($Case-eq'stop-fail'-and$receipt.calls.Count-ne9){throw 'Mac failed normal stop did not retain nine attempts'}
         if($Case-eq'stock-fail'-and@($receipt.calls|Where-Object{$_.plan.label-like'*-verify'}).Count){throw 'Mac full build preceded stock admission'}
     }
@@ -85,7 +108,9 @@ function CheckModel([string]$Case,[string]$HomeState='absent',[switch]$Aliases){
 foreach($s in 'absent','empty','value'){$proof+=CheckModel "positive-$s" $s}
 $proof+=CheckModel 'positive-tar'
 $proof+=CheckModel 'positive-alias' -Aliases
+$proof+=CheckModel 'positive-offset'
 foreach($s in 'stock-fail','fidelity-fail','context-fail','stop-fail','pid-change','id-fail','registry-fail'){$proof+=CheckModel $s}
+foreach($s in 'early-hold','early-missing','early-schema','early-types','early-tracked','early-time','early-reused','early-foreign','early-hold-cleanup-fail','post-census-fail'){$proof+=CheckModel $s}
 $common=@{Project=$project;Jdk=$jdk;Owned=(Join-Path $OutputDirectory 'NOT_CREATED');WatchRoot=$RepositorySource}
 foreach($case in 'no-authority','real-callback','native-gate','owned-target','identity-pin'){
     $args=@{};foreach($p in $common.GetEnumerator()){$args[$p.Key]=$p.Value};$failure=$null
@@ -96,7 +121,7 @@ foreach($case in 'no-authority','real-callback','native-gate','owned-target','id
             real-callback{$null=& $invoke @args -RuntimeApproved -FixtureHooks @{bad={}}}
             native-gate{$null=& $invoke @args -RuntimeApproved}
             owned-target{$args.Owned=Join-Path $project 'target\private';$null=& $invoke @args -FixtureOnly -FixtureHooks @{notCalled=$true}}
-            identity-pin{[IO.File]::AppendAllText($identity,' ');$null=& $invoke @args -FixtureOnly -FixtureHooks @{Setup={};Dispatch={};Owner={};Stock={};Verify={};Compare={};StopPlan={};Stop={};Confirm={}}}
+            identity-pin{[IO.File]::AppendAllText($identity,' ');$null=& $invoke @args -FixtureOnly -FixtureHooks @{Setup={};Dispatch={};Owner={};Census={};Stock={};Verify={};Compare={};StopPlan={};Stop={};Confirm={}}}
         }
     }catch{$failure=$_.Exception.Message}
     finally{if($case-eq'identity-pin'){[IO.File]::WriteAllBytes($identity,$bytes)}}
