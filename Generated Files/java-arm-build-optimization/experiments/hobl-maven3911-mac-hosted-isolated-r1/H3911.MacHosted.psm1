@@ -33,7 +33,7 @@ function Get-HostedSourcePolicy {
 function Assert-H3911MacHostedSource([string]$SourceRoot){
     foreach($row in (& ${function:Get-HostedSourcePolicy})){$file=& ${function:Get-HostedRegular} $SourceRoot $row.file;& ${function:Assert-Hosted} ($file.Length-eq$row.bytes-and(Microsoft.PowerShell.Utility\Get-FileHash $file.FullName).Hash-ceq$row.sha256) 'All runtime/control source byte pins required'}
     $pins=Join-Path $SourceRoot 'runtime-pins.json'
-    & ${function:Assert-Hosted} ((Microsoft.PowerShell.Utility\Get-FileHash $pins).Hash-ceq'0348835152AAE515DD9EB9078F7683482E82D4D5D6663E9DDCA88B0A9A815D2E') 'Closed hosted runtime manifest differs'
+    & ${function:Assert-Hosted} ((Microsoft.PowerShell.Utility\Get-FileHash $pins).Hash-ceq'36CC9986B3F711258EB153A17E0DD5E7E06E040998F1E239E3A74CD7E22168DC') 'Closed hosted runtime manifest differs'
     $rows=Get-Content $pins -Raw|ConvertFrom-Json -AsHashtable -DateKind String
     & ${function:Assert-Hosted} ($rows.Count-eq22) 'Exact required runtime/source-identity closure required'
     foreach($row in $rows){

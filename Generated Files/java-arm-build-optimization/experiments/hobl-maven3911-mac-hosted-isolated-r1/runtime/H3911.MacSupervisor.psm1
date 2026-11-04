@@ -8,7 +8,7 @@ function Read-SupJson([string]$Path){
 }
 function Assert-SupBase {
     $manifest=Join-Path $PSScriptRoot 'mac-qualifier-sha256.json'
-    & ${function:Assert-Sup} ((Microsoft.PowerShell.Utility\Get-FileHash $manifest).Hash-ceq'F7895105FCB4236CA74CB65F722F7189A8FD58978C9163F4CDE0FC7C3C3F3765') 'Frozen Mac source manifest differs'
+    & ${function:Assert-Sup} ((Microsoft.PowerShell.Utility\Get-FileHash $manifest).Hash-ceq'CAC8CC6BC424C00A36A024ABE30C08E4F956757232BB64A742577B5EE2A2CC49') 'Frozen Mac source manifest differs'
     $rows=Get-Content $manifest -Raw|ConvertFrom-Json -AsHashtable -DateKind String
     & ${function:Assert-Sup} ($rows-is[array]-and$rows.Count-eq18) 'Exact frozen source closure required'
     foreach($row in $rows){& ${function:Assert-Sup} ($row.file-is[string]-and$row.file-notmatch'[/\\:]|^\.'-and(Microsoft.PowerShell.Utility\Get-FileHash (Join-Path $PSScriptRoot $row.file)).Hash-ceq$row.sha256) 'Frozen Mac payload differs'}
@@ -20,6 +20,7 @@ function Read-SupScope($Request){
 }
 function Assert-SupQualification($R){
     & ${function:Assert-Sup} ($R-is[hashtable]-and$R.fixtureOnly-is[bool]-and-not$R.fixtureOnly-and$R.status-is[string]-and$R.status-ceq'MAC_UNTIMED_COMPLETE_PENDING_AUDIT') 'Actual returned scalar Mac qualification required'
+    & ${function:Assert-Sup} ($R.ContainsKey('knownOwnedIdentities')-and$R.knownOwnedIdentities-is[array]-and$R.stopProof.schema-ceq'darwin-launch-uid-absence-v2'-and$R.earlyCensus.schema-ceq'darwin-launch-uid-java-census-v2') 'Versioned UID return/tracked set required; no old-scope authority'
     foreach($v in @($R.sourceEqual,$R.rootWatchEqual,$R.restoration.restored,$R.restoration.cwdEqual,$R.restoration.nativeCwdEqual)){& ${function:Assert-Sup} ($v-is[bool]-and$v) 'Explicit source/environment/cwd truth required'}
     & ${function:Assert-Sup} ($R.calls-is[array]-and$R.calls.Count-eq8-and$R.contexts-is[hashtable]-and$R.contexts.Count-eq5-and$R.stopProof-is[hashtable]-and$R.stopProof.status-is[string]-and$R.stopProof.status-ceq'NORMAL_CLI_ROUTE_SCOPED_ABSENCE_CONFIRMED'-and$R.stopProof.evidenceKind-is[string]-and$R.stopProof.evidenceKind-ceq'native-scoped-absence-result'-and$R.stopProof.runtimeAuthorized-is[bool]-and-not$R.stopProof.runtimeAuthorized) 'Full eight calls/five contexts/typed native absence required'
     $required=@('baseline-project','daemon-arch','daemon-home','daemon-project','baseline-maven-home')
@@ -52,18 +53,23 @@ function Get-SupCommand([string]$File,[string]$Name,[string]$Hash){
 function Invoke-SupNativeCleanup($R){
     & ${function:Assert-Sup} ($IsMacOS-and$R.proofOnly-is[bool]-and-not$R.proofOnly) 'Native cleanup cannot be modeled by proof mode'
     $null=& ${function:Assert-SupBase}
-    $c=@{Jdk=$R.inputs.Jdk;Home=(Join-Path $R.qualifierOwned 'home');Registry=(Join-Path $R.qualifierOwned 'registry');Temp=(Join-Path $R.qualifierOwned 'temp');Output=(Join-Path $R.owned 'native-cleanup');KnownOwnedIdentities=@();ExpectedJavaSha256='827ECF403DBFA3CF88E7310B44AD93CB27B75C7E15A7E461DDE0CEE775BB196F';ExpectedJcmdSha256='2D4CB05FEFFBB7F81D6EB5295A84D0DA8B9098AC1A0BD9C314B87585E9498C1A'}
+    & ${function:Assert-Sup} ($R.ContainsKey('knownOwnedIdentities')-and$R.knownOwnedIdentities-is[array]) 'Explicit request tracked set required; unavailable is HOLD'
+    $c=@{Jdk=$R.inputs.Jdk;Home=(Join-Path $R.qualifierOwned 'home');Registry=(Join-Path $R.qualifierOwned 'registry');Temp=(Join-Path $R.qualifierOwned 'temp');Output=(Join-Path $R.owned 'native-cleanup');KnownOwnedIdentities=$R.knownOwnedIdentities;ExpectedJavaSha256='827ECF403DBFA3CF88E7310B44AD93CB27B75C7E15A7E461DDE0CEE775BB196F';ExpectedJcmdSha256='2D4CB05FEFFBB7F81D6EB5295A84D0DA8B9098AC1A0BD9C314B87585E9498C1A'}
     New-Item $c.Output -ItemType Directory -ErrorAction Stop|Out-Null
     $regCmd=& ${function:Get-SupCommand} 'H3911.DarwinOwner.psm1' 'Read-H3911Registry103' 'E9A8FD932AC839119FDD0B810533E8FB69BA314CB038E7345C484A7988A36E1E'
-    $censusCmd=& ${function:Get-SupCommand} 'H3911.DarwinLifecycle.psm1' 'Read-H3911DarwinScopedCensus' '4825B8C82458934A503B181E9756C03934045B803AD482F7C8BF9230680316E2'
+    $censusCmd=& ${function:Get-SupCommand} 'H3911.DarwinLifecycle.psm1' 'Read-H3911DarwinScopedCensus' '8DFD433F1ED138464CAE9FE19B28DDE0B7A91DD37451733D331C813847B8A9FF'
     $out=@{status='HOLD';parentAuxiliaryJcmdMaximum=2;parentEffectiveOwnerReads=0;registryEdited=$false;extraMavenCalls=0;historicalDescendantsAbsent=$false}
     try{
         $reg=& $regCmd ([IO.File]::ReadAllBytes((Join-Path $c.Registry 'registry.bin')))
         & ${function:Assert-Sup} ($reg.schema-ceq'mvnd103-registry'-and$reg.count-is[int]-and$reg.records-is[array]-and$reg.count-eq$reg.records.Count) 'Complete private registry required'
         if($R.mainReturned){
             $record=& ${function:Read-SupJson} (Join-Path $R.qualifierOwned 'mac-qualifier.json');$null=& ${function:Assert-SupQualification} $record
+            & ${function:Assert-Sup} ($record.ContainsKey('knownOwnedIdentities')-and$record.knownOwnedIdentities-is[array]-and$record.knownOwnedIdentities.Count-eq$c.KnownOwnedIdentities.Count) 'Returned tracked set unavailable/different'
+            $same=& $censusCmd.Module {Get-Command Test-LifeSame -CommandType Function}
+            & ${function:Assert-Sup} ($same-is[Management.Automation.FunctionInfo]-and$same.Module.Path-ceq$censusCmd.Module.Path) 'Tracked lifetime comparator origin differs'
+            for($i=0;$i-lt$c.KnownOwnedIdentities.Count;$i++){& ${function:Assert-Sup} (& $same $record.knownOwnedIdentities[$i] $c.KnownOwnedIdentities[$i]) 'Returned tracked identity differs'}
             & ${function:Assert-Sup} ($reg.count-eq0) 'Normal registry zero required'
-            $confirm=& ${function:Get-SupCommand} 'H3911.DarwinLifecycle.psm1' 'Confirm-H3911DarwinCliStop' '4825B8C82458934A503B181E9756C03934045B803AD482F7C8BF9230680316E2'
+            $confirm=& ${function:Get-SupCommand} 'H3911.DarwinLifecycle.psm1' 'Confirm-H3911DarwinCliStop' '8DFD433F1ED138464CAE9FE19B28DDE0B7A91DD37451733D331C813847B8A9FF'
             $facts=& $confirm -Context $c -Expected $record.owner -StopExit 0 -RuntimeApproved
             & ${function:Assert-Sup} ($facts.status-ceq'NORMAL_CLI_ROUTE_SCOPED_ABSENCE_CONFIRMED') 'Independent normal scoped absence required'
             $out.status='NORMAL_RETURNED_AND_SCOPED_ABSENCE';return $out
@@ -77,6 +83,8 @@ function Invoke-SupNativeCleanup($R){
         $p=[Diagnostics.Process]::GetProcessById([int]$owner.pid)
         try{
             & ${function:Assert-Sup} ($p.Id-eq$owner.pid-and$p.StartTime.ToUniversalTime().Ticks-eq[DateTimeOffset]::Parse($owner.created).UtcDateTime.Ticks-and[string]::Equals($p.MainModule.FileName,$owner.executable,[StringComparison]::Ordinal)) 'Reused/foreign process object; no force'
+            $planCmd=& ${function:Get-SupCommand} 'H3911.DarwinLifecycle.psm1' 'New-H3911DarwinPrivateStopPlan' '8DFD433F1ED138464CAE9FE19B28DDE0B7A91DD37451733D331C813847B8A9FF'
+            $null=& $planCmd -Context $c -Expected $owner -RuntimeApproved -Emergency
             $p.Kill();& ${function:Assert-Sup} ($p.WaitForExit(5000)) 'Exact owned native exit unconfirmed'
         }finally{$p.Dispose()}
         $after=& $censusCmd -Context $c -Expected $owner -RuntimeApproved
@@ -132,7 +140,7 @@ function Invoke-H3911MacSupervisor {
     }
     $envBefore=[Environment]::GetEnvironmentVariables('Process');$cwd=(Get-Location).Path;$native=[Environment]::CurrentDirectory
     $digest=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($inputs|ConvertTo-Json -Compress))))
-    $r=@{schema='mac-supervisor-request-v1';owned=$Owned;nonce=$Nonce;inputsDigest=$digest;inputs=$inputs;qualifierOwned=(Join-Path $Owned 'qualification');proofOnly=[bool]$ProofOnly;proofCase=$ProofCase;role=$(if($ProofOnly){'Proof'}else{'Main'})}
+    $r=@{schema='mac-supervisor-request-v1';owned=$Owned;nonce=$Nonce;inputsDigest=$digest;inputs=$inputs;knownOwnedIdentities=@();qualifierOwned=(Join-Path $Owned 'qualification');proofOnly=[bool]$ProofOnly;proofCase=$ProofCase;role=$(if($ProofOnly){'Proof'}else{'Main'})}
     $r.result=Join-Path $Owned ($r.role+'.result.json')
     $out=@{status='FAIL';proofOnly=[bool]$ProofOnly;qualified=$false;nativeCensus=$(if($ProofOnly){'SKIPPED_PROOF_ONLY'}else{'PENDING'});overallBudgetMilliseconds=$DeadlineMilliseconds;runtimeMainMaximumMilliseconds=480000;childClientBudget=8;childClientMaximum=9;childAuxJcmdMaximum=12;parentAuxJcmdMaximum=2;auxJcmdMaximum=14;extraParentMavenCalls=0}
     $receipt=$null;$created=$false;$terminal=$null;$out.receiptPersisted=$false;$out.receiptErrors=@()

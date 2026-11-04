@@ -53,7 +53,10 @@ function CheckModel([string]$Case,[string]$HomeState='absent',[switch]$Aliases){
             if($state.case-eq'early-missing'){return $null}
             $tracked=@{};foreach($p in $anchor.GetEnumerator()){$tracked[$p.Key]=$p.Value}
             $live=@{pid=$anchor.pid;created=$anchor.created;executable=$anchor.executable}
-            $census=@{schema='darwin-scoped-java-census-v1';complete=$true;errors=@();scope='all admitted-JDK Java plus explicitly tracked PID/create identities; not universal historical descendants';jdkExecutable=(Join-Path $c.Jdk 'bin/java');expectedIdentityGone=$false;tracked=@($tracked);sameJdkJava=@($live);knownLive=@($live);evidenceKind='validated-census-model'}
+            $credential=@{pid=$anchor.pid;parentPid=1;realUid=501L;effectiveUid=501L;savedUid=501L;birthSeconds=1767225600L;birthMicroseconds=0L}
+            $selfCredential=@{pid=22222;parentPid=1;realUid=501L;effectiveUid=501L;savedUid=501L;birthSeconds=1767225600L;birthMicroseconds=0L}
+            $census=@{schema='darwin-launch-uid-java-census-v2';complete=$true;errors=@();scope='launch-effective-UID admitted-JDK Java plus explicitly tracked identities';jdkExecutable=(Join-Path $c.Jdk 'bin/java');expectedIdentityGone=$false;tracked=@($tracked);sameJdkJava=@($live);knownLive=@($live);evidenceKind='validated-uid-census-model';uidProof=@{schema='darwin-launch-uid-proof-v2';admittedUid=501L;filter=5;selfIdentity=@{pid=22222;created='2026-01-01T00:00:00Z';executable='/fixture/pwsh'};selfCredential=$selfCredential;ownerCredential=$credential;selectedPidCount=2;knownPidCount=1;unionPidCount=2;validatedPidCount=2;missingAtRecheckCount=0;presenceRecheckAttempts=0;observationBasis='INITIAL_ELIGIBLE_PID_NUMBERS_THEN_UID_SURVIVORS_PLUS_KNOWN_ESRCH_RECHECK';atomicEndpoint=$false;newbornCoverage=$false}}
+            $census.uidProof.universalHistory=$false
             switch($state.case){
                 early-schema{$census.schema='WRONG'}
                 early-types{$census.complete='true'}
@@ -61,7 +64,7 @@ function CheckModel([string]$Case,[string]$HomeState='absent',[switch]$Aliases){
                 early-time{$live.created='not-a-time'}
                 early-reused{$live.created='2026-01-01T00:00:01Z'}
                 early-foreign{$live.executable='FOREIGN'}
-                early-owner-missing{$census.expectedIdentityGone=$true;$census.sameJdkJava=@();$census.knownLive=@()}
+                early-owner-missing{$census.expectedIdentityGone=$true;$census.sameJdkJava=@();$census.knownLive=@();$census.uidProof.ownerCredential=$null;$census.uidProof.validatedPidCount=1;$census.uidProof.missingAtRecheckCount=1;$census.uidProof.presenceRecheckAttempts=1;$census.uidProof.unvalidatedExtra=@{notEvidence='DROP_ME'};$census.uidProof.selfCredential.unvalidatedExtra='DROP_ME'}
                 positive-offset{$live.created='2026-01-01T08:00:00.0000000+08:00';$tracked.created='2026-01-01T00:00:00.0000000Z'}
             }
             $census
@@ -131,3 +134,66 @@ foreach($case in 'no-authority','real-callback','native-gate','owned-target','id
 }
 @{verdict='PASS';cases=$proof;scope='Synthetic pure Windows models, not native Mac execution/coverage/performance'}|ConvertTo-Json -Depth 7|Set-Content (Join-Path $OutputDirectory 'proof.json')
 Write-Output "MAC_QUALIFIER_MODEL_PASS cases=$($proof.Count); no Java/native Mac/runtime"
+$gone=Get-Content (Join-Path $OutputDirectory 'early-owner-missing\mac-qualifier.json') -Raw|ConvertFrom-Json -AsHashtable -DateKind String
+$held=$gone.earlyCensus
+if($held.status-cne'HOLD'-or$held.absenceAsserted-isnot[bool]-or$held.absenceAsserted-or$held.schema-cne'darwin-launch-uid-java-census-v2'-or$held.scope-cne'launch-effective-UID admitted-JDK Java plus explicitly tracked identities'-or$held.uidProof.schema-cne'darwin-launch-uid-proof-v2'-or$held.uidProof.admittedUid-ne501-or$held.uidProof.missingAtRecheckCount-ne1-or$held.uidProof.presenceRecheckAttempts-ne1-or$null-ne$held.uidProof.ownerCredential-or$held.uidProof.ContainsKey('unvalidatedExtra')-or$held.uidProof.selfCredential.ContainsKey('unvalidatedExtra')-or$gone.calls.Count-ne5-or@($gone.calls|Where-Object {$_.plan.label-like'*-verify'}).Count-ne0-or$gone.failure-notlike'*owner absent*'){throw 'Completed owner-gone UID HOLD observation was lost or promoted'}
+@{verdict='PASS';cases=1;fixtureOnly=$true;nativeCalls=0;held=$held;clientCalls=$gone.calls.Count;fullVerifies=0;primary=$gone.failure}|ConvertTo-Json -Depth 9|Set-Content (Join-Path $OutputDirectory 'early-receipt-proof.json')
+Write-Output 'UID_EARLY_HOLD_RECEIPT_PASS cases=1; completed owner-gone v2 preserved; native0'
+$life=Import-Module (Join-Path $PSScriptRoot 'H3911.DarwinLifecycle.psm1') -Force -PassThru
+$ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'H3911.DarwinLifecycle.psm1'),[ref]$tokens,[ref]$errors)
+$collector=$ast.Find({param($n)$n-is[Management.Automation.Language.FunctionDefinitionAst]-and$n.Name-ceq'Get-LifeOsProcesses'},$true).Body.Extent.Text
+$collector=$collector.Substring(1,$collector.Length-2).Replace("if(-not`$IsMacOS-or-not`$RuntimeApproved){throw 'HOLD: native Mac approved census required'}",'')
+$collector=$collector.Replace('$commands=& ${function:Get-LifeUidCommands}','$commands=$script:UidFixtureCommands').Replace('[Diagnostics.Process]::GetProcessById($id)','(& $script:UidFixtureLookup $id)')
+$branch=& $life {param($text)[scriptblock]::Create($text)} $collector
+$uidProof=@()
+foreach($case in 'valid','equivalent-utc','sameuid-unreadable','eperm','unknown-presence','enum-error','self-uid','self-birth','owner-birth','known-outside-uid','known-reuse','unknown-jdk-replacement','owner-gone','post-known-survivor','post-java-survivor','dispose-missing'){
+    $ctx=@{Jdk='/fixture/jdk25';Home='/fixture/mvnd';Registry='/fixture/registry';Temp='/fixture/temp';KnownOwnedIdentities=@()}
+    $owner=@{pid=100;created='2026-01-01T00:00:00Z';executable='/fixture/jdk25/bin/java';daemonId='01234567';home=$ctx.Home;registryFile='/fixture/registry/registry.bin';jniPath='/fixture/temp/native.jnilib';evidenceKind='SYNTHETIC_UID_MODEL'}
+    if($case-in@('known-outside-uid','known-reuse','post-known-survivor')){$ctx.KnownOwnedIdentities=@(@{pid=150;created='2026-01-01T00:00:00Z';executable='/fixture/known'})}
+    & $life {
+        param($case,$owner)
+        $script:UidFixtureCase=$case;$script:UidFixtureLookups=@();$script:UidFixtureOwner=$owner
+        $script:UidFixtureSelf=@{pid=10;created='2026-01-01T00:00:00Z';executable='/fixture/pwsh'}
+        $script:UidFixtureCommands=@{
+            'Read-LifeSelfCredential'={@{pid=10;parentPid=1;realUid=$(if($script:UidFixtureCase-eq'self-uid'){502L}else{501L});effectiveUid=501L;savedUid=501L;birthSeconds=$(if($script:UidFixtureCase-eq'self-birth'){1767225601L}else{1767225600L});birthMicroseconds=0L}}
+            'Get-LifeCurrent'={param($processId)$script:UidFixtureSelf}
+            'Read-LifeOwnUidPids'={if($script:UidFixtureCase-eq'enum-error'){throw 'MODEL_ENUM_TRUNCATED_OR_ERROR'};@{pids=@(10,100)+$(if($script:UidFixtureCase-in@('unknown-jdk-replacement','post-java-survivor')){@(200)}else{@()})}}
+            'Read-LifeOwnerCredential'={
+                param($ProcessId,$ExpectedUid)
+                $seconds=if(($ProcessId-eq100-and$script:UidFixtureCase-eq'owner-birth')-or($ProcessId-eq150-and$script:UidFixtureCase-eq'known-reuse')-or$ProcessId-eq200){1767225601L}else{1767225600L}
+                $uid=if($ProcessId-eq150-and$script:UidFixtureCase-eq'known-outside-uid'){502L}else{501L}
+                & ${function:ConvertFrom-LifeBsdFacts} @([int]136,[int]0,$ProcessId,[int]1,$uid,$uid,$uid,$seconds,0L) $ProcessId $ExpectedUid
+            }
+            'Read-LifePresence'={param($ProcessId)if($script:UidFixtureCase-eq'eperm'){'PRESENT_EPERM'}elseif($script:UidFixtureCase-eq'unknown-presence'){'UNKNOWN'}elseif($script:UidFixtureCase-in@('owner-gone','post-known-survivor','post-java-survivor','dispose-missing','known-reuse')){'MISSING_ESRCH'}else{'PRESENT'}}
+        }
+        $script:UidFixtureLookup={
+            param($processId)
+            $script:UidFixtureLookups+=,$processId
+            if($processId-eq100-and$script:UidFixtureCase-in@('owner-gone','post-known-survivor','post-java-survivor')){throw 'MODEL_LOOKUP_UNAVAILABLE'}
+            $created=if($processId-eq200-or($processId-eq150-and$script:UidFixtureCase-eq'known-reuse')){'2026-01-01T00:00:01Z'}elseif($script:UidFixtureCase-eq'equivalent-utc'){'2026-01-01T08:00:00+08:00'}else{'2026-01-01T00:00:00Z'}
+            $exe=switch($processId){10{'/fixture/pwsh'}150{'/fixture/known'}default{'/fixture/jdk25/bin/java'}}
+            $obj=[pscustomobject]@{StartTime=[DateTimeOffset]::Parse($created).UtcDateTime;MainModule=[pscustomobject]@{FileName=$exe}}
+            if($processId-eq100-and$script:UidFixtureCase-in@('sameuid-unreadable','eperm','unknown-presence','dispose-missing')){$obj|Add-Member StartTime -MemberType ScriptProperty -Value {throw 'MODEL_STARTTIME_UNREADABLE'} -Force}
+            $obj|Add-Member Dispose -MemberType ScriptMethod -Value {if($script:UidFixtureCase-eq'dispose-missing'){throw 'MODEL_DISPOSAL_FAILED'}}
+            $obj
+        }
+    } $case $owner
+    $failure=$null;$census=$null
+    try{$observation=& $life {param($text,$context,$expected)& ([scriptblock]::Create($text)) -Context $context -Expected $expected -RuntimeApproved} $collector $ctx $owner;$census=& $life.ExportedCommands['ConvertTo-H3911DarwinScopedCensus'] $ctx $owner $observation}catch{$failure=$_.Exception.Message}
+    $mustHold=$case-in@('sameuid-unreadable','eperm','unknown-presence','enum-error','self-uid','self-birth','owner-birth','known-outside-uid','known-reuse','dispose-missing')
+    if([bool]$failure-ne$mustHold){throw "Actual UID collector branch unexpected $case : $failure"}
+    if($case-eq'known-outside-uid'){$lookups=& $life {$script:UidFixtureLookups};if(150-notin$lookups){throw 'Explicit known outside filter was dropped'}}
+    if($case-eq'unknown-jdk-replacement'-and$census.sameJdkJava.Count-ne2){throw 'Current unknown JDK replacement was discarded'}
+    if($case-in@('owner-gone','post-known-survivor','post-java-survivor')){
+        $absenceFailure=$null
+        try{$absence=& $life.ExportedCommands['Confirm-H3911DarwinAbsenceFacts'] $ctx $owner @{schema='mvnd103-registry';count=0;records=@()} $census 0}catch{$absenceFailure=$_.Exception.Message}
+        if([bool]$absenceFailure-ne($case-ne'owner-gone')){throw "UID post-stop survivor/ESRCH policy failed $case"}
+    }
+    $uidProof+=@{case=$case;passed=$true;expectedHold=$mustHold;error=$failure;fixtureOnly=$true;actualCollectorAst=$true}
+}
+$legacy=@{schema='darwin-scoped-java-census-v1'}
+$reject=$false;try{$predicate=& $life {Get-Command Assert-LifeUidCensus};& $predicate $ctx $owner $legacy}catch{$reject=$true}
+if(-not$reject){throw 'Legacy v1 acquired UID authority'}
+$uidProof+=@{case='legacy-v1-not-UID-authority';passed=$true}
+@{verdict='PASS';cases=$uidProof;nativeCalls=0;scope='Actual collector AST, native query/origin discovery replaced only by explicit typed private fixtures; no MacOS spoof'}|ConvertTo-Json -Depth 7|Set-Content (Join-Path $OutputDirectory 'uid-collector-proof.json')
+Write-Output "UID_COLLECTOR_ACTUAL_AST_PASS cases=$($uidProof.Count); native0"

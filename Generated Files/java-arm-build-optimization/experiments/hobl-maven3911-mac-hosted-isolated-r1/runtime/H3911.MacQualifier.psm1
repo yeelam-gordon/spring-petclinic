@@ -41,7 +41,7 @@ function Import-MQ {
         'H3911.Darwin103.psm1'=@('05F80C9435B3E6012FAE8874A887A7F96AF8B44311EC1D4A06265ED254E7A264',@('Assert-H3911Darwin103Distribution'))
         'H3911.StockMaven3911.psm1'=@('3D8DCF80AFF694FDC716122B2E76274BBB2D5FD7D882C7D04DC61DE5EF55911D',@('Assert-H3911StockMaven3911'))
         'H3911.EffectiveOwner.psm1'=@('4979E2E0160A6DCF9C7B13E279DA712F047634AABB7F3CB021C2A25578CF7B95',@('Read-H3911DarwinEffectiveOwner'))
-        'H3911.DarwinLifecycle.psm1'=@('4825B8C82458934A503B181E9756C03934045B803AD482F7C8BF9230680316E2',@('New-H3911DarwinPrivateStopPlan','Confirm-H3911DarwinCliStop','Read-H3911DarwinScopedCensus'))}
+        'H3911.DarwinLifecycle.psm1'=@('8DFD433F1ED138464CAE9FE19B28DDE0B7A91DD37451733D331C813847B8A9FF',@('New-H3911DarwinPrivateStopPlan','Confirm-H3911DarwinCliStop','Read-H3911DarwinScopedCensus'))}
     $bound=@{}
     foreach($row in $spec.GetEnumerator()){
         $path=Join-Path $PSScriptRoot $row.Key
@@ -49,6 +49,7 @@ function Import-MQ {
         $m=Import-Module $path -Scope Local -PassThru -DisableNameChecking
         foreach($name in $row.Value[1]){$command=$m.ExportedCommands[$name];& ${function:Assert-MQ} ($command-is[Management.Automation.FunctionInfo]-and$command.Module.Path-ceq$path-and$command.Name-ceq$name) 'Mac command object origin differs';$bound[$name]=$command}
         if($row.Key-ceq'H3911.DarwinLifecycle.psm1'){$same=& $m {Get-Command Test-LifeSame -CommandType Function};& ${function:Assert-MQ} ($same-is[Management.Automation.FunctionInfo]-and$same.Module.Path-ceq$path-and$same.Name-ceq'Test-LifeSame') 'Lifecycle identity comparison origin differs';$bound['Test-LifeSame']=$same}
+        if($row.Key-ceq'H3911.DarwinLifecycle.psm1'){$proof=& $m {Get-Command Assert-LifeUidCensus -CommandType Function};& ${function:Assert-MQ} ($proof-is[Management.Automation.FunctionInfo]-and$proof.Module.Path-ceq$path) 'UID census predicate origin differs';$bound['Assert-LifeUidCensus']=$proof}
     }
     $bound
 }
@@ -87,8 +88,9 @@ function Assert-MQSame($A,$B){
     foreach($key in 'pid','created','daemonId','home','registryFile','executable','jniPath'){& ${function:Assert-MQ} ($A[$key]-ceq$B[$key]) 'Mac owner identity changed'}
 }
 function Assert-MQEarlyCensus($C,$Anchor,$Census,$Commands){
-    $scope='all admitted-JDK Java plus explicitly tracked PID/create identities; not universal historical descendants'
-    & ${function:Assert-MQ} ($Census-is[hashtable]-and$Census.schema-is[string]-and$Census.schema-ceq'darwin-scoped-java-census-v1'-and$Census.complete-is[bool]-and$Census.complete-and$Census.errors-is[array]-and$Census.errors.Count-eq0-and$Census.scope-is[string]-and$Census.scope-ceq$scope-and$Census.jdkExecutable-is[string]-and$Census.jdkExecutable-ceq(Join-Path $C.Jdk 'bin/java')-and$Census.expectedIdentityGone-is[bool]-and-not$Census.expectedIdentityGone) 'Early scoped census incomplete/foreign/owner absent'
+    $scope='launch-effective-UID admitted-JDK Java plus explicitly tracked identities'
+    & ($Commands['Assert-LifeUidCensus']) $C $Anchor $Census
+    & ${function:Assert-MQ} ($Census.jdkExecutable-is[string]-and$Census.jdkExecutable-ceq(Join-Path $C.Jdk 'bin/java')-and-not$Census.expectedIdentityGone) 'Early scoped census incomplete/foreign/owner absent'
     & ${function:Assert-MQ} ($C.KnownOwnedIdentities-is[array]-and$Census.tracked-is[array]-and$Census.tracked.Count-eq(1+$C.KnownOwnedIdentities.Count)-and$Census.sameJdkJava-is[array]-and$Census.sameJdkJava.Count-eq1-and$Census.knownLive-is[array]-and$Census.knownLive.Count-eq1) 'Early scoped census tracked/live set differs'
     $wanted=@($Anchor)+@($C.KnownOwnedIdentities);$seen=[Collections.Generic.HashSet[int]]::new()
     foreach($identity in @($wanted)+@($Census.tracked)+@($Census.sameJdkJava)+@($Census.knownLive)){
@@ -100,10 +102,8 @@ function Assert-MQEarlyCensus($C,$Anchor,$Census,$Commands){
     foreach($key in 'daemonId','home','registryFile','jniPath'){& ${function:Assert-MQ} ($Census.tracked[0][$key]-is[string]-and$Census.tracked[0][$key]-ceq$Anchor[$key]) 'Early tracked owner scope differs'}
     foreach($identity in $Census.sameJdkJava[0],$Census.knownLive[0]){& ${function:Assert-MQ} (& ($Commands['Test-LifeSame']) $Anchor $identity) 'Early live owner reused/foreign'}
     $summary=@{status='COMPLETE_OWNED_RUNNING_SCOPE_CONFIRMED';complete=$true;scope=$scope;ownerPid=$Anchor.pid;trackedCount=$Census.tracked.Count;sameJdkCount=1;knownLiveCount=1;errors=0;ownerLive=$true;absenceAsserted=$false;afterCall='daemon-project';beforeCall='baseline-maven-home';fixtureOnly=$C.FixtureOnly}
-    if(-not$C.FixtureOnly){
-        & ${function:Assert-MQ} ($Census.observationBasis-is[string]-and$Census.observationBasis-ceq'INITIAL_PID_SET_VALIDATED_OR_ESRCH_RECHECK'-and$Census.initialPidSetCount-is[int]-and$Census.missingAtRecheckCount-is[int]-and$Census.presenceRecheckAttempts-is[int]-and$Census.missingAtRecheckCount-ge0-and$Census.presenceRecheckAttempts-ge$Census.missingAtRecheckCount-and$Census.presenceRecheckAttempts-le$Census.initialPidSetCount) 'Native initial-PID-set accounting missing'
-        foreach($field in 'initialPidSetCount','missingAtRecheckCount','presenceRecheckAttempts','observationBasis'){$summary[$field]=$Census[$field]}
-    }
+    if(-not$C.FixtureOnly){& ${function:Assert-MQ} ($Census.evidenceKind-ceq'native-mac-launch-uid-census-v2') 'Actual native UID census required'}
+    $summary.schema=$Census.schema;$summary.uidProof=$Census.uidProof
     $summary
 }
 function Stop-MQ($C,$Commands,$Anchor,$Hooks,[switch]$Emergency){
@@ -193,7 +193,16 @@ function Invoke-H3911MacQualifier {
                 if($label-ceq'daemon-project'){
                     $record.earlyCensus=@{status='HOLD';afterCall=$label;beforeCall='baseline-maven-home';absenceAsserted=$false;fixtureOnly=[bool]$FixtureOnly}
                     $visibility=if($FixtureOnly){& $FixtureHooks.Census $c $anchor}else{& ($commands['Read-H3911DarwinScopedCensus']) -Context $c -Expected $anchor -RuntimeApproved}
-                    if(-not$FixtureOnly){foreach($field in 'initialPidSetCount','missingAtRecheckCount','presenceRecheckAttempts','observationBasis'){$record.earlyCensus[$field]=$visibility[$field]}}
+                    & ($commands['Assert-LifeUidCensus']) $c $anchor $visibility
+                    & ${function:Assert-MQ} ($visibility.schema-is[string]-and$visibility.scope-is[string]-and$visibility.uidProof.schema-is[string]-and$visibility.uidProof.observationBasis-is[string]-and$visibility.uidProof.selfIdentity.executable-is[string]-and$visibility.uidProof.selfIdentity.executable.Length-le4096-and$visibility.uidProof.selfIdentity.executable-notmatch'[\x00-\x1f\x7f]') 'Bounded completed UID observation required'
+                    $held=@{}
+                    foreach($field in 'schema','admittedUid','filter','selectedPidCount','knownPidCount','unionPidCount','validatedPidCount','missingAtRecheckCount','presenceRecheckAttempts','observationBasis','atomicEndpoint','newbornCoverage','universalHistory'){$held[$field]=$visibility.uidProof[$field]}
+                    $held.selfIdentity=@{};foreach($field in 'pid','created','executable'){$held.selfIdentity[$field]=$visibility.uidProof.selfIdentity[$field]}
+                    foreach($role in 'selfCredential','ownerCredential'){
+                        $held[$role]=$null
+                        if($null-ne$visibility.uidProof[$role]){$held[$role]=@{};foreach($field in 'pid','parentPid','realUid','effectiveUid','savedUid','birthSeconds','birthMicroseconds'){$held[$role][$field]=$visibility.uidProof[$role][$field]}}
+                    }
+                    $record.earlyCensus.schema=$visibility.schema;$record.earlyCensus.scope=$visibility.scope;$record.earlyCensus.uidProof=$held
                     $record.earlyCensus=& ${function:Assert-MQEarlyCensus} $c $anchor $visibility $commands
                 }
             }
@@ -207,7 +216,7 @@ function Invoke-H3911MacQualifier {
         [Environment]::CurrentDirectory=$native;$record.restoration=& ($commands['RestorePortableEnvironment']) $before $names;$record.restoration.cwdEqual=(Get-Location).Path-ceq$cwd
         $record.restoration.nativeCwdEqual=[Environment]::CurrentDirectory-ceq$native;$record.rootWatchEqual=((& ${function:Get-MQWatch} $WatchRoot)|ConvertTo-Json -Depth 6 -Compress)-ceq($watch|ConvertTo-Json -Depth 6 -Compress)
         if(-not$record.restoration.restored-or-not$record.restoration.cwdEqual-or-not$record.restoration.nativeCwdEqual-or-not$record.rootWatchEqual-or$record.cleanupFailure){$record.status='FAIL'}
-        $record.calls=$c.Calls;$record.contexts=$c.Contexts;$record.owner=$anchor
+        $record.calls=$c.Calls;$record.contexts=$c.Contexts;$record.owner=$anchor;$record.knownOwnedIdentities=$c.KnownOwnedIdentities
         if($created){$record|ConvertTo-Json -Depth 45 -WarningAction Stop|Set-Content (Join-Path $Owned 'mac-qualifier.json')}
     }
     if($primary){throw $primary};& ${function:Assert-MQ} ($record.status-ne'FAIL') 'Mac cleanup/restoration HOLD'
