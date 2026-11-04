@@ -1,0 +1,120 @@
+# INACTIVE: outside .github; runtime UNALLOCATED. Publication/static replay require separate approval.
+name: Manual Mac ARM PackageScreen experiment
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        description: Exact independently reviewed payload commit; no branch selector
+        required: true
+        type: string
+      candidate_reviewed:
+        required: true
+        type: boolean
+        default: false
+      acknowledgement:
+        description: Future separately approved one-job budget; this file grants none
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  qualify:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.run_attempt == '1' &&
+      github.repository == 'yeelam-gordon/spring-petclinic' &&
+      github.event.repository.fork == true &&
+      github.repository_owner == github.actor &&
+      github.ref == 'refs/heads/perf/arm64-matched-comparison' &&
+      inputs.reviewed_sha == github.sha &&
+      inputs.candidate_reviewed == true &&
+      inputs.acknowledgement == 'I_APPROVE_1_MAC_ARM_PACKAGESCREEN_24_MAX25_1800S_AUX30_NO_RETRY'
+    environment: matched-comparison-approval
+    runs-on: macos-15
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Whole isolated Mac static guards and models, no provisioning
+        run: |
+          $ErrorActionPreference='Stop';$PSNativeCommandUseErrorActionPreference=$false
+          $p=Join-Path $env:GITHUB_WORKSPACE 'Generated Files/java-arm-build-optimization/experiments/hobl-maven3911-mac-package-hosted-profile-isolated-r2'
+          if(('H3911.MacNativeUidV3'-as[type])-or(& git -C $env:GITHUB_WORKSPACE rev-parse HEAD)-cne$env:GITHUB_SHA-or$LASTEXITCODE-ne0){throw 'Static checkout/native-init admission differs'}
+          $m=Import-Module (Join-Path $p 'H3911.MacHosted.psm1') -PassThru -Scope Local
+          $null=& ($m.ExportedCommands['Assert-H3911MacHostedSource']) $p
+          & (Join-Path $p 'Test-MacHosted.ps1') -SourceRoot $p -OutputDirectory (Join-Path $env:GITHUB_WORKSPACE 'Generated Files/mac-package-static/hosted33')
+          & (Join-Path $p 'Test-MacRetentionBoundaries.ps1') -SourceRoot $p -OutputDirectory (Join-Path $env:GITHUB_WORKSPACE 'Generated Files/mac-package-static/retention8')
+          & (Join-Path $p 'runtime/Test-MacQualifier.ps1') -RepositorySource $env:GITHUB_WORKSPACE -OutputDirectory (Join-Path $env:GITHUB_WORKSPACE 'Generated Files/mac-package-static/default30')
+          & ([Environment]::ProcessPath) -NoLogo -NoProfile -NonInteractive -File (Join-Path $p 'Test-MacPackageScreen.ps1') -RepositorySource $env:GITHUB_WORKSPACE -OutputRoot (Join-Path $env:GITHUB_WORKSPACE 'Generated Files/mac-package-static/caller15')
+          & (Join-Path $p 'Test-HostedPackageRetention.ps1') -RepositorySource $env:GITHUB_WORKSPACE -OutputRoot (Join-Path $env:GITHUB_WORKSPACE 'Generated Files/mac-package-static/complete-retention')
+          if($LASTEXITCODE-ne0){throw 'Static fixture child failed'}
+          if('H3911.MacNativeUidV3'-as[type]){throw 'Static models initialized native UID interop'}
+      - name: Native admission and single-request pinned archives
+        id: inputs
+        run: |
+          $ErrorActionPreference='Stop';$PSNativeCommandUseErrorActionPreference=$false
+          if(-not$IsMacOS-or[Runtime.InteropServices.RuntimeInformation]::OSArchitecture-ne'Arm64'-or[Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture-ne'Arm64'){throw 'Actual native ARM64 Mac required; no fallback'}
+          $p=Join-Path $env:GITHUB_WORKSPACE 'Generated Files/java-arm-build-optimization/experiments/hobl-maven3911-mac-package-hosted-profile-isolated-r2'
+          $m=Import-Module (Join-Path $p 'H3911.MacHosted.psm1') -PassThru -Scope Local
+          $null=& ($m.ExportedCommands['Assert-H3911MacHostedSource']) $p
+          $layout=& ($m.ExportedCommands['Get-H3911MacHostedContract']) (Resolve-Path $env:GITHUB_WORKSPACE).ProviderPath -Mode PackageScreen
+          if(Test-Path $layout.root){throw 'Fresh hosted layout required'}
+          New-Item $layout.archives,$layout.setup -ItemType Directory|Out-Null
+          @{actualHead=(& git rev-parse HEAD);sha=$env:GITHUB_SHA;ref=$env:GITHUB_REF;actor=$env:GITHUB_ACTOR;scope='qualification only, not samples'}|ConvertTo-Json|Set-Content (Join-Path $layout.setup 'payload-checkout.json')
+          if($LASTEXITCODE-ne0-or(& git rev-parse HEAD)-cne$env:GITHUB_SHA){throw 'Actual checkout SHA differs'}
+          $hostFacts=@{os=[Runtime.InteropServices.RuntimeInformation]::OSDescription;osArchitecture=[string][Runtime.InteropServices.RuntimeInformation]::OSArchitecture;processArchitecture=[string][Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture;pwsh=[string]$PSVersionTable.PSVersion;framework=[Runtime.InteropServices.RuntimeInformation]::FrameworkDescription}
+          foreach($key in 'hw.model','hw.ncpu','hw.memsize'){$v=& /usr/sbin/sysctl -n $key;if($LASTEXITCODE-ne0){throw 'Actual hardware observation failed'};$hostFacts[$key]=[string]$v}
+          $hostFacts|ConvertTo-Json|Set-Content (Join-Path $layout.setup 'host.json')
+          foreach($inputSpec in $layout.downloads){
+            $archive=Join-Path $layout.archives $inputSpec.file;$receipt=@{status='pending';url=$inputSpec.url;expectedSha256=$inputSpec.sha256;attempts=1}
+            try{
+              $response=Invoke-WebRequest -Uri $inputSpec.url -OutFile $archive -PassThru -MaximumRetryCount 0 -MaximumRedirection 5
+              $receipt.actualSha256=(Get-FileHash $archive).Hash;$receipt.bytes=(Get-Item $archive).Length
+              if($receipt.actualSha256-cne$inputSpec.sha256){throw 'Actual archive digest differs'}
+              $receipt.status='ACTUAL_BYTES_SHA256_VERIFIED'
+            }catch{$receipt.status='FAIL';$receipt.errorKind=$_.FullyQualifiedErrorId;throw}
+            finally{$receipt|ConvertTo-Json|Set-Content (Join-Path $layout.setup ($inputSpec.kind+'-archive.json'))}
+          }
+          "jdkFile=$(Join-Path $layout.archives $layout.downloads[0].file)"|Add-Content $env:GITHUB_OUTPUT
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: jdkfile
+          jdkFile: ${{ steps.inputs.outputs.jdkFile }}
+          architecture: aarch64
+          java-version: '25.0.5'
+          check-latest: false
+          settings-path: ${{ github.workspace }}/mac3911-package-owned/setup-java-settings
+      - name: Ordinary original source and fixed600s supervisor
+        run: |
+          $ErrorActionPreference='Stop';$PSNativeCommandUseErrorActionPreference=$false
+          $p=Join-Path $env:GITHUB_WORKSPACE 'Generated Files/java-arm-build-optimization/experiments/hobl-maven3911-mac-package-hosted-profile-isolated-r2'
+          $m=Import-Module (Join-Path $p 'H3911.MacHosted.psm1') -PassThru -Scope Local
+          $layout=& ($m.ExportedCommands['Get-H3911MacHostedContract']) (Resolve-Path $env:GITHUB_WORKSPACE).ProviderPath -Mode PackageScreen
+          & git clone --quiet --no-checkout --no-hardlinks $env:GITHUB_WORKSPACE $layout.project *> (Join-Path $layout.setup 'clone.log')
+          if($LASTEXITCODE-ne0){throw 'Ordinary full local clone failed'}
+          foreach($a in @(@('config','core.autocrlf','false'),@('remote','set-url','origin','https://github.com/spring-projects/spring-petclinic.git'),@('checkout','--quiet','--detach',$layout.sourcePin))){& git -C $layout.project @a;if($LASTEXITCODE-ne0){throw 'Original source setup failed'}}
+          $jdk=(Resolve-Path -LiteralPath $env:JAVA_HOME).ProviderPath
+          @{head=(& git -C $layout.project rev-parse HEAD);clean=(@(& git -C $layout.project status --porcelain --untracked-files=all).Count-eq0);unixWrapper=(Get-FileHash (Join-Path $layout.project 'mvnw')).Hash;jdkPhysical=$jdk;javaVersionObservation='Actual fork properties retained by full verify, not inferred from runner label'}|ConvertTo-Json|Set-Content (Join-Path $layout.setup 'source-admission.json')
+          & ([Environment]::ProcessPath) -NoProfile -NonInteractive -File (Join-Path $p 'runtime/Invoke-MacSupervisor.ps1') -Owned $layout.run -Nonce ([guid]::NewGuid().ToString('N')) -Project (Resolve-Path $layout.project).ProviderPath -Jdk $jdk -JdkArchive (Resolve-Path (Join-Path $layout.archives $layout.downloads[0].file)).ProviderPath -DistributionArchive (Resolve-Path (Join-Path $layout.archives $layout.downloads[1].file)).ProviderPath -WatchRoot (Resolve-Path $env:GITHUB_WORKSPACE).ProviderPath -RootRuntimeApproved -Mode PackageScreen -DeadlineMilliseconds 1800000
+          $code=$LASTEXITCODE;if($code-isnot[int]-or$code-ne0){throw 'Parent CLI did not return qualification; HOLD/failure is not a sample'}
+      - name: Explicit retention allowlist, including failures
+        if: always()
+        run: |
+          $p=Join-Path $env:GITHUB_WORKSPACE 'Generated Files/java-arm-build-optimization/experiments/hobl-maven3911-mac-package-hosted-profile-isolated-r2'
+          $m=Import-Module (Join-Path $p 'H3911.MacHosted.psm1') -PassThru -Scope Local
+          $layout=& ($m.ExportedCommands['Get-H3911MacHostedContract']) (Resolve-Path $env:GITHUB_WORKSPACE).ProviderPath -Mode PackageScreen
+          $retention=& ($m.ExportedCommands['Copy-H3911MacHostedRetention']) -SourceRoot $p -RunRoot $layout.run -SetupRoot $layout.setup -Destination $layout.retained -Project $layout.project -Mode PackageScreen
+          if($retention.status-cne'ALLOWLIST_RETAINED_NOT_QUALIFICATION'){throw 'Retention admission failed; only curated failure diagnostics are staged'}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: mac3911-packagescreen-${{ github.run_id }}-${{ github.run_attempt }}
+          path: mac3911-package-retained
+          if-no-files-found: error
+          retention-days: 14
