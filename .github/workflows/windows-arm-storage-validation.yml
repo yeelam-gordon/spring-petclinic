@@ -1,0 +1,65 @@
+name: Windows ARM storage candidate validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        description: Exact reviewed commit SHA on perf/windows-arm-storage
+        required: true
+        type: string
+      mode:
+        description: Plan is read-only; provision remains separately unallocated
+        type: choice
+        options: [plan, provision]
+        default: plan
+      live_approval:
+        description: Separate live approval for empty ephemeral ordinary ReFS provisioning
+        type: boolean
+        default: false
+      ack:
+        description: Provision requires APPROVE_EMPTY_EPHEMERAL_NVME_ORDINARY_REFS
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  validation:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.run_attempt == 1 &&
+      github.repository == 'yeelam-gordon/spring-petclinic' &&
+      github.event.repository.fork == true &&
+      github.actor == github.repository_owner &&
+      github.ref == 'refs/heads/perf/windows-arm-storage' &&
+      inputs.reviewed_sha == github.sha &&
+      (inputs.mode == 'plan' ||
+       (inputs.mode == 'provision' && inputs.live_approval == true &&
+        inputs.ack == 'APPROVE_EMPTY_EPHEMERAL_NVME_ORDINARY_REFS'))
+    runs-on: windows-11-arm
+    timeout-minutes: 5
+    steps:
+      - name: Check out reviewed source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Validate candidate with plan as default
+        shell: pwsh
+        env:
+          STORAGE_MODE: ${{ inputs.mode }}
+          STORAGE_LIVE_APPROVAL: ${{ inputs.live_approval }}
+          STORAGE_ACK: ${{ inputs.ack }}
+          STORAGE_REVIEWED_SHA: ${{ inputs.reviewed_sha }}
+        run: |
+          & .\.github\scripts\Invoke-StorageValidation.ps1 -RunnerEnvironment "${{ runner.environment }}"
+      - name: Preserve private JSON receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: storage-candidate-${{ github.run_id }}-1
+          path: ${{ runner.temp }}\storage-candidate-${{ github.run_id }}-1\*.json
+          if-no-files-found: error
+          retention-days: 7
