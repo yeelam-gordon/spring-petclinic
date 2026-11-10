@@ -48,16 +48,30 @@ function Assert-StoragePhysicalPath {
 
 function Get-StorageNativeEvidence {
     param([ValidateSet('C', 'D')][string]$Letter)
-    $lines = @(& fltmc.exe instances -v "${Letter}:" 2>&1 | ForEach-Object { "$_" })
-    if ($LASTEXITCODE -ne 0 -or -not ($lines -match "^\s*WdFilter\s+${Letter}:\s+")) {
-        throw "HOLD: WdFilter attachment not observed on ${Letter}:."
+    $lines = @(& fltmc.exe instances 2>&1 | ForEach-Object { "$_" })
+    $record = [ordered]@{
+        command = 'fltmc.exe instances'; volume = "${Letter}:"; exitCode = $LASTEXITCODE
+        instances = @($lines | Select-Object -First 32 | ForEach-Object { $_.Substring(0, [Math]::Min(256, $_.Length)) })
+    }
+    if ($record.exitCode -ne 0 -or -not ($lines -match "^\s*WdFilter\s+${Letter}:\s+")) {
+        $record.reason = if ($record.exitCode -ne 0) { 'FilterQueryFailed' } else { 'AttachmentNotObserved' }
+        $hold = [InvalidOperationException]::new("HOLD: global filter-instance check $($record.reason) for ${Letter}:; native query evidence retained.")
+        $hold.Data['StorageNativeEvidence'] = $record
+        throw $hold
     }
     $query = @(& fsutil.exe devdrv query "${Letter}:" 2>&1 | ForEach-Object { "$_" })
-    if ($LASTEXITCODE -ne 0 -or
-        (($query -join "`n").Trim() -cne 'This is not a developer volume.')) {
-        throw "HOLD: ${Letter}: not proven ordinary; never attempt trust repair."
+    $record.devDriveQuery = [ordered]@{
+        command = "fsutil.exe devdrv query ${Letter}:"; exitCode = $LASTEXITCODE
+        output = @($query | Select-Object -First 8 | ForEach-Object { $_.Substring(0, [Math]::Min(256, $_.Length)) })
     }
-    [ordered]@{ volume = "${Letter}:"; instances = $lines; devDriveQuery = $query }
+    if ($record.devDriveQuery.exitCode -ne 0 -or
+        (($query -join "`n").Trim() -cne 'This is not a developer volume.')) {
+        $record.reason = 'VolumeNotProvenOrdinary'
+        $hold = [InvalidOperationException]::new("HOLD: ${Letter}: not proven ordinary; never attempt trust repair.")
+        $hold.Data['StorageNativeEvidence'] = $record
+        throw $hold
+    }
+    $record
 }
 
 function Get-StorageProtection {

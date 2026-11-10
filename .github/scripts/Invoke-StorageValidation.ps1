@@ -105,6 +105,49 @@ function Invoke-StorageValidationCaller {
             $diagnostic = $diagnostic -replace '[\x00-\x1f\x7f]', ' '
             $diagnostic = $diagnostic.Substring(0, [Math]::Min(512, $diagnostic.Length))
         }
+        $nativeEvidence = $null
+        if ($phase -in @('InvokePlan', 'InvokeProvision') -and
+            $failure.InvocationInfo.ScriptName -in $trustedSources) {
+            $cleanNativeText = {
+                param([string]$text)
+                $text = $text -replace '(?i)\b[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\b', '[redacted-guid]'
+                $text = $text -replace '(?i)\b(?:private[-_ ]?(?:identifier|id|uid)|unique[-_ ]?id|disk[-_ ]?id)\s*[:=]\s*("[^"]*"|''[^'']*''|\S+)', '[redacted-identity]'
+                $text = $text -replace '(?i)https?://\S+', '[redacted-uri]'
+                $text = $text -replace '(?i)\bBearer\s+\S+', 'Bearer [redacted]'
+                $text = $text -replace '(?i)\b(password|token|secret|credential|authorization)\s*[:=]\s*("[^"]*"|''[^'']*''|\S+)', '$1=[redacted]'
+                $text = $text -replace '[\x00-\x1f\x7f]', ' '
+                $text.Substring(0, [Math]::Min(256, $text.Length))
+            }
+            $node = $failure.Exception
+            for ($depth = 0; $depth -lt 4 -and $null -ne $node; $depth++) {
+                $data = $node.Data['StorageNativeEvidence']
+                if ($data -is [Collections.IDictionary] -and
+                    $data['command'] -ceq 'fltmc.exe instances' -and
+                    $data['volume'] -cin @('C:', 'D:') -and $data['exitCode'] -is [int]) {
+                    $nativeEvidence = [ordered]@{
+                        command = 'fltmc.exe instances'; volume = $data['volume']; exitCode = $data['exitCode']
+                        instances = @($data['instances'] | Select-Object -First 32 |
+                            Where-Object { $_ -is [string] } | ForEach-Object { & $cleanNativeText $_ })
+                    }
+                    if ($data['reason'] -cin @('FilterQueryFailed', 'AttachmentNotObserved', 'VolumeNotProvenOrdinary')) {
+                        $nativeEvidence.reason = $data['reason']
+                        $diagnostic = "HOLD: native query $($data['reason']) for $($data['volume']); inspect bounded nativeQuery record."
+                    }
+                    $fs = $data['devDriveQuery']
+                    if ($fs -is [Collections.IDictionary] -and
+                        $fs['command'] -ceq "fsutil.exe devdrv query $($data['volume'])" -and
+                        $fs['exitCode'] -is [int]) {
+                        $nativeEvidence.devDriveQuery = [ordered]@{
+                            command = $fs['command']; exitCode = $fs['exitCode']
+                            output = @($fs['output'] | Select-Object -First 8 |
+                                Where-Object { $_ -is [string] } | ForEach-Object { & $cleanNativeText $_ })
+                        }
+                    }
+                    break
+                }
+                $node = $node.InnerException
+            }
+        }
         if ($null -ne $safeEvidence) {
             try {
                 if (-not (Test-Path -LiteralPath $safeEvidence)) {
@@ -122,7 +165,8 @@ function Invoke-StorageValidationCaller {
                     type = $failure.Exception.GetType().FullName.Substring(0,
                         [Math]::Min(128, $failure.Exception.GetType().FullName.Length))
                     message = $diagnostic
-                } | ConvertTo-Json |
+                    nativeQuery = $nativeEvidence
+                } | ConvertTo-Json -Depth 8 |
                     Set-Content -LiteralPath (Join-Path $safeEvidence 'validation-error.json') -Encoding utf8 -ErrorAction Stop
             }
             catch {
