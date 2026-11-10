@@ -1,0 +1,52 @@
+name: Read-only Windows ARM storage inventory
+
+on:
+  workflow_dispatch:
+    inputs:
+      reviewed_sha:
+        description: Exact reviewed commit SHA on perf/windows-arm-storage
+        required: true
+        type: string
+      ack:
+        description: APPROVE_ONE_READONLY_WINDOWS_ARM_STORAGE_INVENTORY_5MIN
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.run_attempt == 1 &&
+      github.repository == 'yeelam-gordon/spring-petclinic' &&
+      github.event.repository.fork == true &&
+      github.actor == github.repository_owner &&
+      github.ref == 'refs/heads/perf/windows-arm-storage' &&
+      inputs.reviewed_sha == github.sha &&
+      inputs.ack == 'APPROVE_ONE_READONLY_WINDOWS_ARM_STORAGE_INVENTORY_5MIN'
+    runs-on: windows-11-arm
+    timeout-minutes: 5
+    steps:
+      - name: Check out reviewed source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Inventory storage without changing disks or protection
+        shell: pwsh
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP "storage-inventory-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          & .\.github\scripts\Get-HostedStorageInventory.ps1 -RunnerEnvironment "${{ runner.environment }}" -OutputDirectory $output
+      - name: Preserve inventory and explicit failure evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: storage-inventory-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}\storage-inventory-${{ github.run_id }}-${{ github.run_attempt }}\inventory.json
+            ${{ runner.temp }}\storage-inventory-${{ github.run_id }}-${{ github.run_attempt }}\error.json
+          if-no-files-found: error
+          retention-days: 7
