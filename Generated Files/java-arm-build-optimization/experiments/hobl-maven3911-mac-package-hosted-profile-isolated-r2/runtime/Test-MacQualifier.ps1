@@ -185,7 +185,7 @@ foreach($case in 'valid','equivalent-utc','sameuid-unreadable','eperm','unknown-
     if([bool]$failure-ne$mustHold){throw "Actual UID collector branch unexpected $case : $failure"}
     $diagnostic=@{
         'owner-birth'=@('credential-binding','BIRTH_BINDING')
-        'birth-precision'=@('credential-binding','BIRTH_PRECISION')
+        'birth-precision'=@('credential-binding','BIRTH_BINDING')
         'invalid-executable'=@('identity-shape','EXECUTABLE_PATH')
         'known-reuse'=@('tracked-identity','KNOWN_IDENTITY')
         'unclassified-credential'=@('kernel-credential','UNCLASSIFIED')
@@ -209,3 +209,34 @@ if(-not$reject){throw 'Legacy v1 acquired UID authority'}
 $uidProof+=@{case='legacy-v1-not-UID-authority';passed=$true}
 @{verdict='PASS';cases=$uidProof;nativeCalls=0;scope='Actual collector AST, native query/origin discovery replaced only by explicit typed private fixtures; no MacOS spoof'}|ConvertTo-Json -Depth 7|Set-Content (Join-Path $OutputDirectory 'uid-collector-proof.json')
 Write-Output "UID_COLLECTOR_ACTUAL_AST_PASS cases=$($uidProof.Count); native0"
+$projectionProof=@()
+# Golden Unix ticks from the v10.0.15 Process.OSX.cs/TimeSpan(double) producer, not exact-microsecond normalization.
+foreach($sample in @(
+    @{name='projected-eight';microseconds=8L;unixTicks=17955032910000082L}
+    @{name='projected-thirteen';microseconds=13L;unixTicks=17955032910000132L}
+    @{name='projected-eighteen';microseconds=18L;unixTicks=17955032910000178L}
+    @{name='second-start';microseconds=0L;unixTicks=17955032910000000L}
+    @{name='second-end';microseconds=999999L;unixTicks=17955032919999990L}
+    @{name='equivalent-offset';microseconds=8L;unixTicks=17955032910000082L;offset=$true}
+    @{name='wrong-normalized-time';microseconds=8L;unixTicks=17955032910000080L;hold=$true}
+    @{name='one-tick-mismatch';microseconds=8L;unixTicks=17955032910000083L;hold=$true}
+    @{name='native-microsecond-mismatch';microseconds=9L;unixTicks=17955032910000082L;hold=$true}
+    @{name='native-second-mismatch';microseconds=8L;unixTicks=17955032910000082L;seconds=1795503292L;hold=$true}
+    @{name='foreign-pid';microseconds=8L;unixTicks=17955032910000082L;pid=101;hold=$true}
+    @{name='foreign-uid';microseconds=8L;unixTicks=17955032910000082L;uid=502L;hold=$true}
+    @{name='microseconds-out-of-range';microseconds=1000000L;unixTicks=17955032910000082L;hold=$true}
+    @{name='ambiguous-native-birth';microseconds=0L;unixTicks=171798691840000000L;seconds=17179869184L;hold=$true}
+)){
+    $seconds=if($sample.ContainsKey('seconds')){$sample.seconds}else{1795503291L}
+    $facts=@{pid=100;parentPid=1;realUid=501L;effectiveUid=501L;savedUid=501L;birthSeconds=$seconds;birthMicroseconds=$sample.microseconds}
+    $created=[DateTimeOffset]::new([DateTime]::UnixEpoch.AddTicks($sample.unixTicks))
+    if($sample.offset){$created=$created.ToOffset([TimeSpan]::FromHours(8))}
+    $identity=@{pid=$(if($sample.pid){$sample.pid}else{100});created=$created.ToString('o');executable='/fixture/jdk25/bin/java'}
+    $failure=$null
+    try{& $life {param($facts,$identity,$uid)Assert-LifeCredentialIdentity $facts $identity $uid} $facts $identity $(if($sample.uid){$sample.uid}else{501L})}catch{$failure=$_.Exception.Message}
+    if([bool]$failure-ne[bool]$sample.hold-or$facts.birthMicroseconds-ne$sample.microseconds-or$facts.birthSeconds-ne$seconds-or$identity.created-cne$created.ToString('o')){throw "Exact native-birth projection differs $($sample.name) : $failure"}
+    if($sample.name-ceq'ambiguous-native-birth'-and$failure-cne'HOLD: Kernel birth projection cannot uniquely bind microseconds'){throw 'Ambiguous native microsecond identity was not rejected'}
+    $projectionProof+=@{case=$sample.name;passed=$true;expectedHold=[bool]$sample.hold;error=$failure;nativeMicroseconds=$facts.birthMicroseconds;created=$identity.created}
+}
+@{verdict='PASS';cases=$projectionProof;nativeCalls=0;scope='Exact .NET 10.0.15 Darwin projection; full native tuple retained; no interop or process calls'}|ConvertTo-Json -Depth 7|Set-Content (Join-Path $OutputDirectory 'birth-projection-proof.json')
+Write-Output "DARWIN_BIRTH_PROJECTION_PASS cases=$($projectionProof.Count); native0; no precision normalization"

@@ -11,7 +11,7 @@ function Import-H3911MacRuntimeInputs {
         'H3911.Darwin103.psm1'=@('05F80C9435B3E6012FAE8874A887A7F96AF8B44311EC1D4A06265ED254E7A264',@('Assert-H3911Darwin103Distribution'))
         'H3911.StockMaven3911.psm1'=@('3D8DCF80AFF694FDC716122B2E76274BBB2D5FD7D882C7D04DC61DE5EF55911D',@('Assert-H3911StockMaven3911'))
         'H3911.EffectiveOwner.psm1'=@('4979E2E0160A6DCF9C7B13E279DA712F047634AABB7F3CB021C2A25578CF7B95',@('Read-H3911DarwinEffectiveOwner'))
-        'H3911.DarwinLifecycle.psm1'=@('69730CD5E5314B5DD9FD67C99B5AA9B18DD91DCE102E608044142A6B703739CF',@('New-H3911DarwinPrivateStopPlan','Confirm-H3911DarwinCliStop','Read-H3911DarwinScopedCensus'))}
+        'H3911.DarwinLifecycle.psm1'=@('7037B0ACE1FCFC2FC1A132A81E062154B9108011BDBC53C9613C88EDB0C194A9',@('New-H3911DarwinPrivateStopPlan','Confirm-H3911DarwinCliStop','Read-H3911DarwinScopedCensus'))}
     $bound=@{}
     foreach($row in $spec.GetEnumerator()){
         $path=Join-Path $PSScriptRoot $row.Key

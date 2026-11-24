@@ -46,7 +46,7 @@ function Assert-H3911MacHostedSource([string]$SourceRoot){
     & ${function:Assert-Hosted} ($actual.Count-eq$names.Count) 'Unadmitted source role/count'
     foreach($file in $actual){$name=[IO.Path]::GetRelativePath($SourceRoot,$file.FullName).Replace([IO.Path]::DirectorySeparatorChar,[char]47);& ${function:Assert-Hosted} ($name-cin$names) 'Unadmitted source role'}
     $pins=Join-Path $SourceRoot 'runtime-pins.json'
-    & ${function:Assert-Hosted} ((Microsoft.PowerShell.Utility\Get-FileHash $pins).Hash-ceq'87332ECDBE7D6A30DAD1A6993D2FF05C6E79CD9807C3A34A8956922F0486C76E') 'Closed hosted runtime manifest differs'
+    & ${function:Assert-Hosted} ((Microsoft.PowerShell.Utility\Get-FileHash $pins).Hash-ceq'D915DC16627B38ECE3710E04581DA6F8F510F4E7855871B3AF95E02F36B16C7A') 'Closed hosted runtime manifest differs'
     $rows=Get-Content $pins -Raw|ConvertFrom-Json -AsHashtable -DateKind String
     & ${function:Assert-Hosted} ($rows.Count-eq26) 'Exact required runtime/source-identity closure required'
     foreach($row in $rows){

@@ -30,15 +30,21 @@ function Test-LifeCreationInstant([string]$A,[string]$B){
 function Test-LifeSame($A,$B){
     ($A.pid-eq$B.pid)-and(Test-LifeCreationInstant $A.created $B.created)-and[string]::Equals($A.executable,$B.executable,[StringComparison]::Ordinal)
 }
+function ConvertTo-LifeStartTimeTicks([long]$Seconds,[long]$Microseconds){
+    Assert-DarwinLife ([Environment]::Version-eq[version]'10.0.15') 'Unreviewed Darwin StartTime projection runtime'
+    # .NET v10.0.15 Process.OSX.cs StartTimeCore uses this double-valued projection.
+    [DateTime]::UnixEpoch.Add([TimeSpan]::FromSeconds([double]$Seconds+([double]$Microseconds/1000000.0))).Ticks
+}
 function Assert-LifeCredentialIdentity($Facts,$Identity,$Uid){
     Assert-DarwinLife ($Identity-is[hashtable]-and($Identity.pid-is[int]-or$Identity.pid-is[long])-and$Identity.pid-gt0-and$Identity.pid-le[int]::MaxValue-and$Identity.created-is[string]-and$Identity.created-cmatch'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,7})?(?:Z|[+-]\d\d:\d\d)$') 'Typed credential PID/birth identity required'
     Assert-DarwinLife ($Facts-is[hashtable]) 'Kernel credential facts required'
     $null=& ${function:ConvertFrom-LifeBsdFacts} @([int]136,[int]0,$Facts.pid,$Facts.parentPid,$Facts.realUid,$Facts.effectiveUid,$Facts.savedUid,$Facts.birthSeconds,$Facts.birthMicroseconds) $Identity.pid $Uid
-    $delta=[DateTimeOffset]::Parse($Identity.created,[Globalization.CultureInfo]::InvariantCulture).UtcTicks-[DateTimeOffset]::UnixEpoch.UtcTicks
-    $remainder=0L;$seconds=[Math]::DivRem([long]$delta,10000000L,[ref]$remainder)
-    Assert-DarwinLife ($remainder-ge0-and$remainder%10-eq0) 'Kernel microsecond birth cannot bind metadata'
-    $unused=0L;$microseconds=[Math]::DivRem($remainder,10L,[ref]$unused)
-    & ${function:Assert-LifeCredentialBinding} $Facts $Identity.pid $Uid $seconds $microseconds
+    $projected=& ${function:ConvertTo-LifeStartTimeTicks} $Facts.birthSeconds $Facts.birthMicroseconds
+    $nativeMicroseconds=[long]$Facts.birthSeconds*1000000L+[long]$Facts.birthMicroseconds
+    $previousMicroseconds=0L;$previousSeconds=[Math]::DivRem(($nativeMicroseconds-1L),1000000L,[ref]$previousMicroseconds)
+    $nextMicroseconds=0L;$nextSeconds=[Math]::DivRem(($nativeMicroseconds+1L),1000000L,[ref]$nextMicroseconds)
+    Assert-DarwinLife (($projected-gt(& ${function:ConvertTo-LifeStartTimeTicks} $previousSeconds $previousMicroseconds))-and($projected-lt(& ${function:ConvertTo-LifeStartTimeTicks} $nextSeconds $nextMicroseconds))) 'Kernel birth projection cannot uniquely bind microseconds'
+    Assert-DarwinLife ([DateTimeOffset]::Parse($Identity.created,[Globalization.CultureInfo]::InvariantCulture).UtcTicks-eq$projected) 'Kernel PID/UID/birth binding mismatch'
 }
 function Get-LifeUidCommands {
     $map=@{}
@@ -284,6 +290,8 @@ function Get-LifeOsProcesses {
                     'HOLD: Nonroot real/effective/saved UID invariant required'{'CREDENTIAL_UID'}
                     'HOLD: BSD birth outside supported range'{'CREDENTIAL_BIRTH_RANGE'}
                     'HOLD: Kernel microsecond birth cannot bind metadata'{'BIRTH_PRECISION'}
+                    'HOLD: Unreviewed Darwin StartTime projection runtime'{'START_TIME_RUNTIME'}
+                    'HOLD: Kernel birth projection cannot uniquely bind microseconds'{'BIRTH_PROJECTION_AMBIGUOUS'}
                     'HOLD: Kernel PID/UID/birth binding mismatch'{'BIRTH_BINDING'}
                     'HOLD: Known PID reuse/foreign identity HOLD'{'KNOWN_IDENTITY'}
                     default{'UNCLASSIFIED'}

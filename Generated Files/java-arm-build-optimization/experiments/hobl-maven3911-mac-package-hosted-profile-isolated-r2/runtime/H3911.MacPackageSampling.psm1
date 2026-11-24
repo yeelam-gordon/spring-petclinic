@@ -1,7 +1,7 @@
 function Assert-MPackage($Value,[string]$Message){if(-not$Value){throw "HOLD: $Message"}}
 function Import-MPackage {
     $spec=@{
-        'H3911.MacRuntimeInputs.psm1'=@('8F6EADA3D5742C56151FCB805BFDFCF22D19A22CA08AB73B65B6282ED9E49ED1',@('Import-H3911MacRuntimeInputs','Assert-H3911MacSdk','Resolve-H3911MacInputPath','Assert-H3911MacInputDisjoint'))
+        'H3911.MacRuntimeInputs.psm1'=@('57A5B16CB1476B4E1EDD857A76692F239F116178D440A1F7E748F189E834FC4C',@('Import-H3911MacRuntimeInputs','Assert-H3911MacSdk','Resolve-H3911MacInputPath','Assert-H3911MacInputDisjoint'))
         'H3911.PackageSampling.psm1'=@('CA1E15176728C26C5ED009F53ADEECBF19E9D16B89913FC388A0631F9D96FC22',@('Get-H3911RetainedProtocol','Get-H3911PackageDecision','Get-PScreenFileBinding','Assert-PScreenSeal','Assert-PScreenFullGate'))
         'H3911.Artifacts.psm1'=@('BD2B01750B3F6954425599F0E70F34F2A04B122E03724B1482704E76FC6B55F6',@('Read-H3911Artifact'))
         'H3911.Offline.psm1'=@('99B6CA8A3025FBF5D55C7DE8E1871C8C0BEF47A69CA541D4C1472A73CC6BEF1D',@('Assert-H3911OfflineDelta'))
