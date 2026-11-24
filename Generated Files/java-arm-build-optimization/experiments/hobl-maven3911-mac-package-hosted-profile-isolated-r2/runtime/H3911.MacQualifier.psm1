@@ -5,7 +5,7 @@ function Get-MQModeContract([ValidateSet('Qualify','PackageScreen',IgnoreCase=$f
 }
 function Get-MQSamplingCommands {
     $path=Join-Path $PSScriptRoot 'H3911.MacPackageSampling.psm1'
-    & ${function:Assert-MQ} ((Microsoft.PowerShell.Utility\Get-FileHash $path).Hash-ceq'0F7DD72480DBE1245EC961D34B86C2EB549364DA78A93C070A3A738961F90016') 'Pinned Mac operator differs'
+    & ${function:Assert-MQ} ((Microsoft.PowerShell.Utility\Get-FileHash $path).Hash-ceq'9631B4240794895910CDA719CFBCA715CC050274A9515F944FF5237F93B9D85B') 'Pinned Mac operator differs'
     $m=Import-Module $path -Scope Local -PassThru -DisableNameChecking
     $import=& $m {Get-Command Import-MPackage -CommandType Function}
     & ${function:Assert-MQ} ($import-is[Management.Automation.FunctionInfo]-and$import.Module.Path-ceq$path-and$import.Name-ceq'Import-MPackage') 'Operator import origin differs'
@@ -96,7 +96,7 @@ function New-MQReportByteWitness([string]$CaptureRoot,[string]$Phase){
 }
 function Get-MQRuntimeInputs {
     $path=Join-Path $PSScriptRoot 'H3911.MacRuntimeInputs.psm1'
-    & ${function:Assert-MQ} ((Microsoft.PowerShell.Utility\Get-FileHash $path).Hash-ceq'57A5B16CB1476B4E1EDD857A76692F239F116178D440A1F7E748F189E834FC4C') 'Mac runtime-input leaf differs'
+    & ${function:Assert-MQ} ((Microsoft.PowerShell.Utility\Get-FileHash $path).Hash-ceq'6DE8EF8890C9F85A4C3BAAA5DE2B1C9E38B9C69F41EE9F70436880EACDCDB440') 'Mac runtime-input leaf differs'
     $cached=Get-Variable -Name MQRuntimeInputs -Scope Script -ErrorAction SilentlyContinue
     if(-not$cached){
         $m=Import-Module $path -Scope Local -PassThru -DisableNameChecking;$bound=@{}

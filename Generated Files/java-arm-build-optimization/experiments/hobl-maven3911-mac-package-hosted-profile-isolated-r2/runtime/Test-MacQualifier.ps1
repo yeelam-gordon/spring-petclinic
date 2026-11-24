@@ -146,10 +146,10 @@ $collector=$collector.Substring(1,$collector.Length-2).Replace("if(-not`$IsMacOS
 $collector=$collector.Replace('$commands=& ${function:Get-LifeUidCommands}','$commands=$script:UidFixtureCommands').Replace('[Diagnostics.Process]::GetProcessById($id)','(& $script:UidFixtureLookup $id)')
 $branch=& $life {param($text)[scriptblock]::Create($text)} $collector
 $uidProof=@()
-foreach($case in 'valid','equivalent-utc','sameuid-unreadable','eperm','unknown-presence','enum-error','self-uid','self-birth','owner-birth','birth-precision','invalid-executable','unclassified-credential','known-outside-uid','known-reuse','unknown-jdk-replacement','owner-gone','post-known-survivor','post-java-survivor','dispose-missing'){
+foreach($case in 'valid','equivalent-utc','sameuid-unreadable','eperm','unknown-presence','enum-error','self-uid','self-birth','owner-birth','birth-precision','invalid-executable','unclassified-credential','selected-mixed-real','selected-mixed-saved','selected-effective-drift','known-credential-drift','uid-matching-image','uid-tampered-birth','uid-unknown-context','uid-noncanonical-image','uid-ambiguous-birth','uid-owner-drift','uid-self-drift','known-uid-birth-mismatch','known-outside-uid','known-reuse','unknown-jdk-replacement','owner-gone','post-known-survivor','post-java-survivor','dispose-missing'){
     $ctx=@{Jdk='/fixture/jdk25';Home='/fixture/mvnd';Registry='/fixture/registry';Temp='/fixture/temp';KnownOwnedIdentities=@()}
     $owner=@{pid=100;created='2026-01-01T00:00:00Z';executable='/fixture/jdk25/bin/java';daemonId='01234567';home=$ctx.Home;registryFile='/fixture/registry/registry.bin';jniPath='/fixture/temp/native.jnilib';evidenceKind='SYNTHETIC_UID_MODEL'}
-    if($case-in@('known-outside-uid','known-reuse','post-known-survivor')){$ctx.KnownOwnedIdentities=@(@{pid=150;created='2026-01-01T00:00:00Z';executable='/fixture/known'})}
+    if($case-in@('known-outside-uid','known-reuse','known-credential-drift','known-uid-birth-mismatch','post-known-survivor')){$ctx.KnownOwnedIdentities=@(@{pid=150;created='2026-01-01T00:00:00Z';executable='/fixture/known'})}
     & $life {
         param($case,$owner)
         $script:UidFixtureCase=$case;$script:UidFixtureLookups=@();$script:UidFixtureOwner=$owner;$script:UidFixturePresenceCalls=0
@@ -157,13 +157,18 @@ foreach($case in 'valid','equivalent-utc','sameuid-unreadable','eperm','unknown-
         $script:UidFixtureCommands=@{
             'Read-LifeSelfCredential'={@{pid=10;parentPid=1;realUid=$(if($script:UidFixtureCase-eq'self-uid'){502L}else{501L});effectiveUid=501L;savedUid=501L;birthSeconds=$(if($script:UidFixtureCase-eq'self-birth'){1767225601L}else{1767225600L});birthMicroseconds=0L}}
             'Get-LifeCurrent'={param($processId)$script:UidFixtureSelf}
-            'Read-LifeOwnUidPids'={if($script:UidFixtureCase-eq'enum-error'){throw 'MODEL_ENUM_TRUNCATED_OR_ERROR'};@{pids=@(10,100)+$(if($script:UidFixtureCase-in@('unknown-jdk-replacement','post-java-survivor')){@(200)}else{@()})}}
+            'Read-LifeOwnUidPids'={if($script:UidFixtureCase-eq'enum-error'){throw 'MODEL_ENUM_TRUNCATED_OR_ERROR'};@{pids=@(10,100)+$(if($script:UidFixtureCase-like'uid-*'-or$script:UidFixtureCase-in@('unknown-jdk-replacement','post-java-survivor','selected-mixed-real','selected-mixed-saved','selected-effective-drift')){@(200)}else{@()})}}
             'Read-LifeOwnerCredential'={
-                param($ProcessId,$ExpectedUid)
-                if($script:UidFixtureCase-eq'unclassified-credential'){throw "SENSITIVE_FIXTURE_ONLY`n/untrusted/path"}
-                $seconds=if(($ProcessId-eq100-and$script:UidFixtureCase-eq'owner-birth')-or($ProcessId-eq150-and$script:UidFixtureCase-eq'known-reuse')-or$ProcessId-eq200){1767225601L}else{1767225600L}
+                param($ProcessId,$ExpectedUid,$FailureContext)
+                if($script:UidFixtureCase-eq'unclassified-credential'){throw "HOLD: Nonroot real/effective/saved UID invariant required [uidComparison=MZMSENSITIVE_FIXTURE_ONLY]`n/untrusted/path"}
+                $seconds=if($ProcessId-eq200-and$script:UidFixtureCase-eq'uid-ambiguous-birth'){17179869184L}elseif(($ProcessId-eq100-and$script:UidFixtureCase-eq'owner-birth')-or($ProcessId-eq150-and$script:UidFixtureCase-in@('known-reuse','known-uid-birth-mismatch'))-or$ProcessId-eq200){1767225601L}else{1767225600L}
                 $uid=if($ProcessId-eq150-and$script:UidFixtureCase-eq'known-outside-uid'){502L}else{501L}
-                & ${function:ConvertFrom-LifeBsdFacts} @([int]136,[int]0,$ProcessId,[int]1,$uid,$uid,$uid,$seconds,0L) $ProcessId $ExpectedUid
+                $real=$uid;$effective=$uid;$saved=$uid
+                if($ProcessId-eq200-and$script:UidFixtureCase-eq'selected-mixed-real'){$real=0L}
+                if(($ProcessId-eq200-and($script:UidFixtureCase-eq'selected-mixed-saved'-or$script:UidFixtureCase-like'uid-*'))-or($ProcessId-eq150-and$script:UidFixtureCase-in@('known-credential-drift','known-uid-birth-mismatch'))-or($ProcessId-eq100-and$script:UidFixtureCase-eq'uid-owner-drift')-or($ProcessId-eq10-and$script:UidFixtureCase-eq'uid-self-drift')){$saved=0L}
+                if($ProcessId-eq200-and$script:UidFixtureCase-eq'selected-effective-drift'){$effective=502L}
+                if($script:UidFixtureCase-eq'uid-unknown-context'){$FailureContext=$null}
+                & ${function:ConvertFrom-LifeBsdFacts} @([int]136,[int]0,$ProcessId,[int]1,$real,$effective,$saved,$seconds,0L) $ProcessId $ExpectedUid $FailureContext
             }
             'Read-LifePresence'={param($ProcessId)$script:UidFixturePresenceCalls++;if($script:UidFixtureCase-eq'eperm'){'PRESENT_EPERM'}elseif($script:UidFixtureCase-eq'unknown-presence'){'UNKNOWN'}elseif($script:UidFixtureCase-in@('owner-gone','post-known-survivor','post-java-survivor','dispose-missing','known-reuse')){'MISSING_ESRCH'}else{'PRESENT'}}
         }
@@ -171,8 +176,8 @@ foreach($case in 'valid','equivalent-utc','sameuid-unreadable','eperm','unknown-
             param($processId)
             $script:UidFixtureLookups+=,$processId
             if($processId-eq100-and$script:UidFixtureCase-in@('owner-gone','post-known-survivor','post-java-survivor')){throw 'MODEL_LOOKUP_UNAVAILABLE'}
-            $created=if($processId-eq200-or($processId-eq150-and$script:UidFixtureCase-eq'known-reuse')){'2026-01-01T00:00:01Z'}elseif($script:UidFixtureCase-eq'equivalent-utc'){'2026-01-01T08:00:00+08:00'}elseif($script:UidFixtureCase-eq'birth-precision'){'2026-01-01T00:00:00.0000001Z'}else{'2026-01-01T00:00:00Z'}
-            $exe=if($script:UidFixtureCase-eq'invalid-executable'){'relative/SENSITIVE_FIXTURE_ONLY'}else{switch($processId){10{'/fixture/pwsh'}150{'/fixture/known'}default{'/fixture/jdk25/bin/java'}}}
+            $created=if($processId-eq200-and$script:UidFixtureCase-eq'uid-ambiguous-birth'){[DateTime]::UnixEpoch.AddSeconds(17179869184L).ToString('o')}elseif($processId-eq200-and$script:UidFixtureCase-eq'uid-tampered-birth'){'2026-01-01T00:00:02Z'}elseif($processId-eq200-or($processId-eq150-and$script:UidFixtureCase-in@('known-reuse','known-uid-birth-mismatch'))){'2026-01-01T00:00:01Z'}elseif($script:UidFixtureCase-eq'equivalent-utc'){'2026-01-01T08:00:00+08:00'}elseif($script:UidFixtureCase-eq'birth-precision'){'2026-01-01T00:00:00.0000001Z'}else{'2026-01-01T00:00:00Z'}
+            $exe=if($script:UidFixtureCase-eq'invalid-executable'-or($processId-eq200-and$script:UidFixtureCase-eq'uid-noncanonical-image')){'relative/SENSITIVE_FIXTURE_ONLY'}elseif($processId-eq200-and$script:UidFixtureCase-in@('selected-mixed-real','selected-mixed-saved','selected-effective-drift','uid-tampered-birth','uid-unknown-context','uid-ambiguous-birth')){'/fixture/nonjava'}else{switch($processId){10{'/fixture/pwsh'}150{'/fixture/known'}default{'/fixture/jdk25/bin/java'}}}
             $obj=[pscustomobject]@{StartTime=[DateTimeOffset]::Parse($created).UtcDateTime;MainModule=[pscustomobject]@{FileName=$exe}}
             if($processId-eq100-and$script:UidFixtureCase-in@('sameuid-unreadable','eperm','unknown-presence','dispose-missing')){$obj|Add-Member StartTime -MemberType ScriptProperty -Value {throw 'MODEL_STARTTIME_UNREADABLE'} -Force}
             $obj|Add-Member Dispose -MemberType ScriptMethod -Value {if($script:UidFixtureCase-eq'dispose-missing'){throw 'MODEL_DISPOSAL_FAILED'}}
@@ -181,7 +186,7 @@ foreach($case in 'valid','equivalent-utc','sameuid-unreadable','eperm','unknown-
     } $case $owner
     $failure=$null;$census=$null
     try{$observation=& $life {param($text,$context,$expected)& ([scriptblock]::Create($text)) -Context $context -Expected $expected -RuntimeApproved} $collector $ctx $owner;$census=& $life.ExportedCommands['ConvertTo-H3911DarwinScopedCensus'] $ctx $owner $observation}catch{$failure=$_.Exception.Message}
-    $mustHold=$case-in@('sameuid-unreadable','eperm','unknown-presence','enum-error','self-uid','self-birth','owner-birth','birth-precision','invalid-executable','unclassified-credential','known-outside-uid','known-reuse','dispose-missing')
+    $mustHold=$case-in@('sameuid-unreadable','eperm','unknown-presence','enum-error','self-uid','self-birth','owner-birth','birth-precision','invalid-executable','unclassified-credential','selected-mixed-real','selected-mixed-saved','selected-effective-drift','known-credential-drift','uid-matching-image','uid-tampered-birth','uid-unknown-context','uid-noncanonical-image','uid-ambiguous-birth','uid-owner-drift','uid-self-drift','known-uid-birth-mismatch','known-outside-uid','known-reuse','dispose-missing')
     if([bool]$failure-ne$mustHold){throw "Actual UID collector branch unexpected $case : $failure"}
     $diagnostic=@{
         'owner-birth'=@('credential-binding','BIRTH_BINDING')
@@ -189,10 +194,42 @@ foreach($case in 'valid','equivalent-utc','sameuid-unreadable','eperm','unknown-
         'invalid-executable'=@('identity-shape','EXECUTABLE_PATH')
         'known-reuse'=@('tracked-identity','KNOWN_IDENTITY')
         'unclassified-credential'=@('kernel-credential','UNCLASSIFIED')
+        'selected-mixed-real'=@('kernel-credential','CREDENTIAL_UID')
+        'selected-mixed-saved'=@('kernel-credential','CREDENTIAL_UID')
+        'selected-effective-drift'=@('kernel-credential','CREDENTIAL_UID')
+        'known-credential-drift'=@('kernel-credential','CREDENTIAL_UID')
+        'uid-matching-image'=@('kernel-credential','CREDENTIAL_UID')
+        'uid-tampered-birth'=@('kernel-credential','CREDENTIAL_UID')
+        'uid-unknown-context'=@('kernel-credential','CREDENTIAL_UID')
+        'uid-noncanonical-image'=@('kernel-credential','CREDENTIAL_UID')
+        'uid-ambiguous-birth'=@('kernel-credential','CREDENTIAL_UID')
+        'uid-owner-drift'=@('kernel-credential','CREDENTIAL_UID')
+        'uid-self-drift'=@('kernel-credential','CREDENTIAL_UID')
+        'known-uid-birth-mismatch'=@('kernel-credential','CREDENTIAL_UID')
     }
     if($diagnostic.ContainsKey($case)){
         $expected=$diagnostic[$case];$presenceCalls=& $life {$script:UidFixturePresenceCalls}
         if($failure-notlike('*phase='+$expected[0]+';*')-or-not$failure.Contains('[invariant='+$expected[1]+']')-or-not$failure.Contains('scanComplete=false')-or$failure.Contains('SENSITIVE_FIXTURE_ONLY')-or$failure-match'[\r\n]'-or$presenceCalls-ne0){throw "Fail-closed bounded census diagnostic differs $case : $failure"}
+    }
+    $uidCodes=@{'selected-mixed-real'='ZMM';'selected-mixed-saved'='MMZ';'selected-effective-drift'='MOM';'known-credential-drift'='MMZ';'uid-matching-image'='MMZ';'uid-tampered-birth'='MMZ';'uid-unknown-context'='MMZ';'uid-noncanonical-image'='MMZ';'uid-ambiguous-birth'='MMZ';'uid-owner-drift'='MMZ';'uid-self-drift'='MMZ';'known-uid-birth-mismatch'='MMZ'}
+    if($uidCodes.ContainsKey($case)-and(-not$failure.Contains('[uidComparison='+$uidCodes[$case]+']')-or$null-ne$census)){throw "Failed UID row lost its bounded comparison or acquired census authority $case"}
+    $scopeTags=@{
+        'selected-mixed-real'=@('OTHER','OTHER_CANONICAL','MATCH')
+        'selected-mixed-saved'=@('OTHER','OTHER_CANONICAL','MATCH')
+        'selected-effective-drift'=@('OTHER','OTHER_CANONICAL','MATCH')
+        'known-credential-drift'=@('KNOWN_TRACKED','OTHER_CANONICAL','MATCH')
+        'uid-matching-image'=@('OTHER','ADMITTED_JDK_JAVA','MATCH')
+        'uid-tampered-birth'=@('OTHER','OTHER_CANONICAL','MISMATCH')
+        'uid-unknown-context'=@('UNKNOWN','UNKNOWN','UNAVAILABLE')
+        'uid-noncanonical-image'=@('OTHER','UNKNOWN','UNAVAILABLE')
+        'uid-ambiguous-birth'=@('OTHER','OTHER_CANONICAL','UNAVAILABLE')
+        'uid-owner-drift'=@('EXPECTED_OWNER','ADMITTED_JDK_JAVA','MATCH')
+        'uid-self-drift'=@('SELF','OTHER_CANONICAL','MATCH')
+        'known-uid-birth-mismatch'=@('KNOWN_TRACKED','OTHER_CANONICAL','MISMATCH')
+    }
+    if($scopeTags.ContainsKey($case)){
+        $wanted=$scopeTags[$case]
+        if(-not$failure.Contains('[pidScope='+$wanted[0]+']')-or-not$failure.Contains('[exeScope='+$wanted[1]+']')-or-not$failure.Contains('[birthBinding='+$wanted[2]+']')){throw "Rejected credential context lost $case : $failure"}
     }
     if($case-eq'known-outside-uid'){$lookups=& $life {$script:UidFixtureLookups};if(150-notin$lookups){throw 'Explicit known outside filter was dropped'}}
     if($case-eq'unknown-jdk-replacement'-and$census.sameJdkJava.Count-ne2){throw 'Current unknown JDK replacement was discarded'}

@@ -217,11 +217,51 @@ function Read-LifePresence([ValidateRange(1,2147483647)][int]$ProcessId,[switch]
     $facts=$type::Read($ProcessId)
     & ${function:ConvertTo-LifePresenceReason} $facts[0] $facts[1]
 }
-function ConvertFrom-LifeBsdFacts($Wire,$ExpectedPid,$ExpectedUid){
+function Get-LifeRejectedCredentialScope($Wire,$ExpectedPid,[hashtable]$Context){
+    # PID-set membership only; OTHER is not an unrelated/system-process determination.
+    $tags=@{pidScope='UNKNOWN';exeScope='UNKNOWN';birthBinding='UNAVAILABLE'};$snapshot=$null;$observed=if($Context-is[hashtable]){$Context['observed']}else{$null}
+    try{
+        Assert-DarwinLife ($observed-is[hashtable]-and($observed.pid-is[int]-or$observed.pid-is[long])-and$observed.pid-eq$ExpectedPid-and$Context.known-is[array]) 'Diagnostic PID context unavailable'
+        $members=@($Context.self,$Context.expected)+@($Context.known);$ids=[Collections.Generic.HashSet[int]]::new()
+        foreach($member in $members){Assert-DarwinLife ($member-is[hashtable]-and($member.pid-is[int]-or$member.pid-is[long])-and$member.pid-gt0-and$member.pid-le[int]::MaxValue-and$ids.Add([int]$member.pid)) 'Diagnostic PID sets unavailable'}
+        $tags.pidScope=if($ExpectedPid-eq$Context.self.pid){$snapshot=$Context.self;'SELF'}elseif($ExpectedPid-eq$Context.expected.pid){$snapshot=$Context.expected;'EXPECTED_OWNER'}elseif($ids.Contains([int]$ExpectedPid)){$snapshot=@($Context.known|Where-Object pid -eq $ExpectedPid)[0];'KNOWN_TRACKED'}else{'OTHER'}
+    }catch{}
+    try{
+        Assert-DarwinLife ($observed-is[hashtable]-and($observed.pid-is[int]-or$observed.pid-is[long])-and$observed.pid-eq$ExpectedPid) 'Diagnostic executable context unavailable'
+        Assert-LifePath $observed.executable;Assert-LifePath $Context.jdkExecutable
+        Assert-DarwinLife ($Context.jdkExecutable.EndsWith('/bin/java',[StringComparison]::Ordinal)) 'Diagnostic admitted Java path unavailable'
+        $tags.exeScope=if([string]::Equals($observed.executable,$Context.jdkExecutable,[StringComparison]::Ordinal)){'ADMITTED_JDK_JAVA'}else{'OTHER_CANONICAL'}
+    }catch{}
+    try{
+        Assert-DarwinLife ($tags.pidScope-cne'UNKNOWN') 'Diagnostic birth context unavailable'
+        Assert-LifeIdentity $observed
+        Assert-DarwinLife ($Wire-is[array]-and$Wire.Count-in@(9,11)) 'Diagnostic wire unavailable'
+        foreach($n in $Wire){Assert-DarwinLife ($n-is[int]-or$n-is[long]) 'Diagnostic wire types unavailable'}
+        Assert-DarwinLife ($Wire[0]-eq136-and$Wire[2]-eq$ExpectedPid-and$Wire[3]-ge0-and$Wire[3]-le[int]::MaxValue-and$Wire[7]-gt0-and$Wire[7]-le253402300799-and$Wire[8]-ge0-and$Wire[8]-le999999) 'Diagnostic native identity unavailable'
+        foreach($index in 4,5,6){Assert-DarwinLife ($Wire[$index]-ge0-and$Wire[$index]-le[uint32]::MaxValue) 'Diagnostic credential representation unavailable'}
+        $projected=& ${function:ConvertTo-LifeStartTimeTicks} $Wire[7] $Wire[8]
+        $nativeMicroseconds=[long]$Wire[7]*1000000L+[long]$Wire[8]
+        $previousMicroseconds=0L;$previousSeconds=[Math]::DivRem(($nativeMicroseconds-1L),1000000L,[ref]$previousMicroseconds)
+        $nextMicroseconds=0L;$nextSeconds=[Math]::DivRem(($nativeMicroseconds+1L),1000000L,[ref]$nextMicroseconds)
+        Assert-DarwinLife (($projected-gt(& ${function:ConvertTo-LifeStartTimeTicks} $previousSeconds $previousMicroseconds))-and($projected-lt(& ${function:ConvertTo-LifeStartTimeTicks} $nextSeconds $nextMicroseconds))) 'Diagnostic birth projection unavailable'
+        $matches=[DateTimeOffset]::Parse($observed.created,[Globalization.CultureInfo]::InvariantCulture).UtcTicks-eq$projected
+        if($snapshot){Assert-LifeIdentity $snapshot;$matches=$matches-and(Test-LifeCreationInstant $snapshot.created $observed.created)}
+        $tags.birthBinding=if($matches){'MATCH'}else{'MISMATCH'}
+    }catch{}
+    $tags
+}
+function ConvertFrom-LifeBsdFacts($Wire,$ExpectedPid,$ExpectedUid,[hashtable]$FailureContext){
     Assert-DarwinLife ($Wire-is[array]-and$Wire.Count-in@(9,11)) 'Exact BSD fact wire required'
     foreach($n in $Wire){Assert-DarwinLife (($n-is[int]-or$n-is[long])) 'Integer BSD facts required'}
     Assert-DarwinLife (($ExpectedPid-is[int]-or$ExpectedPid-is[long])-and$ExpectedPid-gt0-and$ExpectedPid-le[int]::MaxValue-and($ExpectedUid-is[int]-or$ExpectedUid-is[long])-and$ExpectedUid-gt0-and$ExpectedUid-le[uint32]::MaxValue-and$Wire[0]-eq136-and$Wire[2]-eq$ExpectedPid-and$Wire[3]-ge0-and$Wire[3]-le[int]::MaxValue) 'BSD size/PID/parent/expected UID mismatch'
-    foreach($index in 4,5,6){Assert-DarwinLife ($Wire[$index]-eq$ExpectedUid) 'Nonroot real/effective/saved UID invariant required'}
+    try{foreach($index in 4,5,6){Assert-DarwinLife ($Wire[$index]-eq$ExpectedUid) 'Nonroot real/effective/saved UID invariant required'}}
+    catch{
+        # Real/effective/saved: match, zero, other uint32, invalid; never emit raw credential values.
+        $uidComparison=-join@(foreach($index in 4,5,6){if($Wire[$index]-lt0-or$Wire[$index]-gt[uint32]::MaxValue){'I'}elseif($Wire[$index]-eq$ExpectedUid){'M'}elseif($Wire[$index]-eq0){'Z'}else{'O'}})
+        $scope=@{pidScope='UNKNOWN';exeScope='UNKNOWN';birthBinding='UNAVAILABLE'}
+        try{$scope=& ${function:Get-LifeRejectedCredentialScope} $Wire $ExpectedPid $FailureContext}catch{}
+        throw ('HOLD: Nonroot real/effective/saved UID invariant required [uidComparison='+$uidComparison+'] [pidScope='+$scope.pidScope+'] [exeScope='+$scope.exeScope+'] [birthBinding='+$scope.birthBinding+']')
+    }
     Assert-DarwinLife ($Wire[7]-gt0-and$Wire[7]-le253402300799-and$Wire[8]-ge0-and$Wire[8]-le999999) 'BSD birth outside supported range'
     if($Wire.Count-eq11){Assert-DarwinLife ($Wire[9]-eq$ExpectedUid-and$Wire[10]-eq$ExpectedUid) 'getuid/geteuid/kernel disagreement'}
     @{pid=[int]$Wire[2];parentPid=[int]$Wire[3];realUid=$Wire[4];effectiveUid=$Wire[5];savedUid=$Wire[6];birthSeconds=$Wire[7];birthMicroseconds=$Wire[8]}
@@ -242,10 +282,10 @@ function Read-LifeSelfCredential([switch]$RuntimeApproved){
     $type=& ${function:Get-LifeNativeType} -RuntimeApproved:$RuntimeApproved;$wire=$type::ReadSelf()
     & ${function:ConvertFrom-LifeBsdFacts} $wire $wire[2] $wire[10]
 }
-function Read-LifeOwnerCredential([ValidateRange(1,2147483647)][int]$ProcessId,[ValidateRange(1,4294967295)][long]$ExpectedUid,[switch]$RuntimeApproved){
+function Read-LifeOwnerCredential([ValidateRange(1,2147483647)][int]$ProcessId,[ValidateRange(1,4294967295)][long]$ExpectedUid,[switch]$RuntimeApproved,[hashtable]$FailureContext){
     $type=& ${function:Get-LifeNativeType} -RuntimeApproved:$RuntimeApproved
     try{$wire=$type::ReadBsd($ProcessId)}catch{throw 'HOLD: kernel credential read unavailable [credentialReadUnavailable=true]'}
-    & ${function:ConvertFrom-LifeBsdFacts} $wire $ProcessId $ExpectedUid
+    & ${function:ConvertFrom-LifeBsdFacts} $wire $ProcessId $ExpectedUid $FailureContext
 }
 function Read-LifeOwnUidPids([ValidateRange(1,4294967295)][long]$ExpectedUid,[switch]$RuntimeApproved){
     $type=& ${function:Get-LifeNativeType} -RuntimeApproved:$RuntimeApproved;$wire=$type::ListOwnUid([uint32]$ExpectedUid)
@@ -269,7 +309,7 @@ function Get-LifeOsProcesses {
             $phase='main-module';$module=$p.MainModule;if($null-eq$module){throw 'Unavailable module value'}
             $phase='module-file-name';$executable=$module.FileName;if($null-eq$executable){throw 'Unavailable executable value'}
             $phase='kernel-credential';$semantic=$true
-            $credential=& $commands['Read-LifeOwnerCredential'] -ProcessId $id -ExpectedUid $self.uid -RuntimeApproved
+            $credential=& $commands['Read-LifeOwnerCredential'] -ProcessId $id -ExpectedUid $self.uid -RuntimeApproved -FailureContext @{observed=@{pid=$id;created=$created;executable=$executable};self=$self.identity;expected=$Expected;known=$Context.KnownOwnedIdentities;jdkExecutable=($Context.Jdk+'/bin/java')}
             $phase='identity-shape';$row=@{pid=$id;created=$created;executable=$executable;credential=$credential};Assert-LifeIdentity $row
             $phase='credential-binding'
             & ${function:Assert-LifeCredentialIdentity} $credential $row $self.uid
@@ -296,7 +336,13 @@ function Get-LifeOsProcesses {
                     'HOLD: Known PID reuse/foreign identity HOLD'{'KNOWN_IDENTITY'}
                     default{'UNCLASSIFIED'}
                 }
-                throw ('HOLD: UID/lifetime invariant [reason=CENSUS_ROW_FAILED;phase='+$phase+';pid='+$pidText+';scanComplete=false] [invariant='+$invariant+']')
+                $uidDetail=''
+                $uidMatch=[regex]::Match($_.Exception.Message,'\AHOLD: Nonroot real/effective/saved UID invariant required \[uidComparison=([MZOI]{3})\]\z')
+                if($invariant-ceq'CREDENTIAL_UID'){$uidDetail=' [uidComparison=UNAVAILABLE] [pidScope=UNKNOWN] [exeScope=UNKNOWN] [birthBinding=UNAVAILABLE]'}
+                if($uidMatch.Success){$invariant='CREDENTIAL_UID';$uidDetail=' [uidComparison='+$uidMatch.Groups[1].Value+'] [pidScope=UNKNOWN] [exeScope=UNKNOWN] [birthBinding=UNAVAILABLE]'}
+                $scopeMatch=[regex]::Match($_.Exception.Message,'\AHOLD: Nonroot real/effective/saved UID invariant required \[uidComparison=([MZOI]{3})\] \[pidScope=(SELF|EXPECTED_OWNER|KNOWN_TRACKED|OTHER|UNKNOWN)\] \[exeScope=(ADMITTED_JDK_JAVA|OTHER_CANONICAL|UNKNOWN)\] \[birthBinding=(MATCH|MISMATCH|UNAVAILABLE)\]\z')
+                if($scopeMatch.Success){$invariant='CREDENTIAL_UID';$uidDetail=' [uidComparison='+$scopeMatch.Groups[1].Value+'] [pidScope='+$scopeMatch.Groups[2].Value+'] [exeScope='+$scopeMatch.Groups[3].Value+'] [birthBinding='+$scopeMatch.Groups[4].Value+']'}
+                throw ('HOLD: UID/lifetime invariant [reason=CENSUS_ROW_FAILED;phase='+$phase+';pid='+$pidText+';scanComplete=false] [invariant='+$invariant+']'+$uidDetail)
             }
             $rechecks++;try{$presence=& $commands['Read-LifePresence'] -ProcessId ([int]$id) -RuntimeApproved:$RuntimeApproved}catch{$presence='UNKNOWN'}
             $missingConfirmed=$presence-is[string]-and$presence-ceq'MISSING_ESRCH'
