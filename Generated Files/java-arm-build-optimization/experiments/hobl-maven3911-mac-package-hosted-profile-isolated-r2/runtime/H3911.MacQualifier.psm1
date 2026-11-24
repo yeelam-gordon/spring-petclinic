@@ -165,7 +165,6 @@ function Invoke-H3911MacQualifier {
     if($FixtureOnly){foreach($key in 'Setup','Dispatch','Owner','Census','Stock','Verify','Compare','StopPlan','Stop','Confirm'){& ${function:Assert-MQ} ($FixtureHooks[$key]-is[scriptblock]) 'Complete explicit Mac fixture hooks required'}}
     if($FixtureOnly-and$Mode-ceq'PackageScreen'){& ${function:Assert-MQ} ($FixtureHooks.Sampling-is[hashtable]) 'Explicit native-boundary sampler fixtures required'}
     $commands=& ${function:Import-MQ}
-    if($RuntimeApproved){$null=& ($commands['Get-LifeNativeType']) -RuntimeApproved}
     $samplingCommands=if($Mode-ceq'PackageScreen'){& ${function:Get-MQSamplingCommands}}else{$null}
     & ${function:Assert-MQ} ((Microsoft.PowerShell.Utility\Get-FileHash (Join-Path $PSScriptRoot 'mac-jdk25-identity.json')).Hash-ceq'B4C08E1980A986419E9B402E9DF2B8DBA2C800E62E20995B1C9420EBE031678E') 'Trusted Mac JDK manifest differs'
     $names=@('JAVA_HOME','PATH','MAVEN_USER_HOME','MAVEN_OPTS','MAVEN_ARGS','JAVA_TOOL_OPTIONS','JDK_JAVA_OPTIONS','_JAVA_OPTIONS','MAVEN_SKIP_RC','JAVACMD','MVNW_PREFER_PWSH','MVND_CLIENT','MVND_HOME','MVND_DAEMON_STORAGE','MVND_OPTS','MVND_JVM_ARGS','TMP','TEMP','TMPDIR')
@@ -175,6 +174,7 @@ function Invoke-H3911MacQualifier {
     $c.OwnerReads=@();$c.ScreenNotBefore=[DateTimeOffset]::UtcNow.ToString('o')
     $null=& ($commands['Assert-H3911Source']) $c
     if($RuntimeApproved){$null=& ${function:Assert-MQSdk} $c $JdkArchive}
+    if($RuntimeApproved){$null=& ($commands['Get-LifeNativeType']) -RuntimeApproved}
     $before=& ($commands['PortableEnvironmentSnapshot']);$cwd=(Get-Location).Path;$native=[Environment]::CurrentDirectory;$watch=& ${function:Get-MQWatch} $WatchRoot
     $record=@{owned=$Owned;mode=$Mode;contract=$contract;screenNotBefore=$c.ScreenNotBefore;fixtureOnly=[bool]$FixtureOnly;runtimeQualified=$false;status='ADMISSION';plannedClientCalls=$contract.normalMaximum;allBuildsUntimed=($Mode-ceq'Qualify')};$created=$false;$anchor=$null;$normal=$false;$primary=$null
     try{

@@ -17,6 +17,19 @@ foreach($name in 'event','repository','actor','ref','sha','reviewedSha','environ
     $proof+=@{case="guard-$name";passed=$true}
 }
 $null=& $source $SourceRoot;$proof+=@{case='actual-closed-runtime-source';passed=$true}
+function Assert-ModelNativeAdmissionOrder([string]$Source){
+    $tokens=$null;$errors=$null
+    $ast=[Management.Automation.Language.Parser]::ParseInput($Source,[ref]$tokens,[ref]$errors)
+    if($errors.Count){throw 'Qualifier source parse failed'}
+    $qualifier=$ast.Find({param($n)$n-is[Management.Automation.Language.FunctionDefinitionAst]-and$n.Name-ceq'Invoke-H3911MacQualifier'},$true)
+    $statements=@($qualifier.Body.EndBlock.Statements)
+    $sdk=@($statements|Where-Object {$_.Extent.Text-ceq'if($RuntimeApproved){$null=& ${function:Assert-MQSdk} $c $JdkArchive}'})
+    $origin=@($statements|Where-Object {$_.Extent.Text-ceq"if(`$RuntimeApproved){`$null=& (`$commands['Get-LifeNativeType']) -RuntimeApproved}"})
+    $allocation=$qualifier.Find({param($n)$n-is[Management.Automation.Language.CommandAst]-and$n.GetCommandName()-ceq'New-Item'-and$n.Extent.Text.StartsWith('New-Item $Owned ')},$true)
+    if($sdk.Count-ne1-or$origin.Count-ne1-or-not$allocation-or$sdk[0].Extent.EndOffset-ge$origin[0].Extent.StartOffset-or$origin[0].Extent.EndOffset-ge$allocation.Extent.StartOffset){throw 'SDK admission must precede runtime-only native metadata initialization before allocation'}
+}
+Assert-ModelNativeAdmissionOrder ([IO.File]::ReadAllText((Join-Path $SourceRoot 'runtime/H3911.MacQualifier.psm1')))
+$proof+=@{case='sdk-rejection-before-runtime-only-native-metadata';passed=$true}
 $changed=Join-Path $OutputDirectory 'changed-public-source';New-Item $changed -ItemType Directory|Out-Null;Copy-Item (Join-Path $SourceRoot 'runtime') $changed -Recurse;Copy-Item (Join-Path $SourceRoot 'runtime-pins.json'),(Join-Path $SourceRoot '.gitattributes') $changed
 [IO.File]::AppendAllText((Join-Path $changed 'runtime/H3911.NativeProcess.psm1'),'SYNTHETIC_MUTATION')
 $errorText=$null;try{$null=& $source $changed}catch{$errorText=$_.Exception.Message};if(-not$errorText){throw 'Changed public source admitted'};$proof+=@{case='source-byte-negative';passed=$true}

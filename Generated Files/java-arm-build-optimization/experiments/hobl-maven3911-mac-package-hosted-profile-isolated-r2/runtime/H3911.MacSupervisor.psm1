@@ -8,7 +8,7 @@ function Read-SupJson([string]$Path){
 }
 function Assert-SupBase {
     $manifest=Join-Path $PSScriptRoot 'mac-qualifier-sha256.json'
-    & ${function:Assert-Sup} ((Microsoft.PowerShell.Utility\Get-FileHash $manifest).Hash-ceq'C77308C975C3ED6C15F4B8FCAD5AF689FC491619247DB36DB224175B8D70B13C') 'Frozen Mac source manifest differs'
+    & ${function:Assert-Sup} ((Microsoft.PowerShell.Utility\Get-FileHash $manifest).Hash-ceq'F31ED6B5823ADD0E6C0B50289BF577F104EC33A0FFA55A46AFD924B2CDD622E3') 'Frozen Mac source manifest differs'
     $rows=Get-Content $manifest -Raw|ConvertFrom-Json -AsHashtable -DateKind String
     & ${function:Assert-Sup} ($rows-is[array]-and$rows.Count-eq22) 'Exact frozen source closure required'
     foreach($row in $rows){& ${function:Assert-Sup} ($row.file-is[string]-and$row.file-notmatch'[/\\:]|^\.'-and(Microsoft.PowerShell.Utility\Get-FileHash (Join-Path $PSScriptRoot $row.file)).Hash-ceq$row.sha256) 'Frozen Mac payload differs'}
