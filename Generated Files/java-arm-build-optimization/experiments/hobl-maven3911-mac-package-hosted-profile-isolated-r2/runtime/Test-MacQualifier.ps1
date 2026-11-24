@@ -146,13 +146,13 @@ $collector=$collector.Substring(1,$collector.Length-2).Replace("if(-not`$IsMacOS
 $collector=$collector.Replace('$commands=& ${function:Get-LifeUidCommands}','$commands=$script:UidFixtureCommands').Replace('[Diagnostics.Process]::GetProcessById($id)','(& $script:UidFixtureLookup $id)')
 $branch=& $life {param($text)[scriptblock]::Create($text)} $collector
 $uidProof=@()
-foreach($case in 'valid','equivalent-utc','sameuid-unreadable','eperm','unknown-presence','enum-error','self-uid','self-birth','owner-birth','known-outside-uid','known-reuse','unknown-jdk-replacement','owner-gone','post-known-survivor','post-java-survivor','dispose-missing'){
+foreach($case in 'valid','equivalent-utc','sameuid-unreadable','eperm','unknown-presence','enum-error','self-uid','self-birth','owner-birth','birth-precision','invalid-executable','unclassified-credential','known-outside-uid','known-reuse','unknown-jdk-replacement','owner-gone','post-known-survivor','post-java-survivor','dispose-missing'){
     $ctx=@{Jdk='/fixture/jdk25';Home='/fixture/mvnd';Registry='/fixture/registry';Temp='/fixture/temp';KnownOwnedIdentities=@()}
     $owner=@{pid=100;created='2026-01-01T00:00:00Z';executable='/fixture/jdk25/bin/java';daemonId='01234567';home=$ctx.Home;registryFile='/fixture/registry/registry.bin';jniPath='/fixture/temp/native.jnilib';evidenceKind='SYNTHETIC_UID_MODEL'}
     if($case-in@('known-outside-uid','known-reuse','post-known-survivor')){$ctx.KnownOwnedIdentities=@(@{pid=150;created='2026-01-01T00:00:00Z';executable='/fixture/known'})}
     & $life {
         param($case,$owner)
-        $script:UidFixtureCase=$case;$script:UidFixtureLookups=@();$script:UidFixtureOwner=$owner
+        $script:UidFixtureCase=$case;$script:UidFixtureLookups=@();$script:UidFixtureOwner=$owner;$script:UidFixturePresenceCalls=0
         $script:UidFixtureSelf=@{pid=10;created='2026-01-01T00:00:00Z';executable='/fixture/pwsh'}
         $script:UidFixtureCommands=@{
             'Read-LifeSelfCredential'={@{pid=10;parentPid=1;realUid=$(if($script:UidFixtureCase-eq'self-uid'){502L}else{501L});effectiveUid=501L;savedUid=501L;birthSeconds=$(if($script:UidFixtureCase-eq'self-birth'){1767225601L}else{1767225600L});birthMicroseconds=0L}}
@@ -160,18 +160,19 @@ foreach($case in 'valid','equivalent-utc','sameuid-unreadable','eperm','unknown-
             'Read-LifeOwnUidPids'={if($script:UidFixtureCase-eq'enum-error'){throw 'MODEL_ENUM_TRUNCATED_OR_ERROR'};@{pids=@(10,100)+$(if($script:UidFixtureCase-in@('unknown-jdk-replacement','post-java-survivor')){@(200)}else{@()})}}
             'Read-LifeOwnerCredential'={
                 param($ProcessId,$ExpectedUid)
+                if($script:UidFixtureCase-eq'unclassified-credential'){throw "SENSITIVE_FIXTURE_ONLY`n/untrusted/path"}
                 $seconds=if(($ProcessId-eq100-and$script:UidFixtureCase-eq'owner-birth')-or($ProcessId-eq150-and$script:UidFixtureCase-eq'known-reuse')-or$ProcessId-eq200){1767225601L}else{1767225600L}
                 $uid=if($ProcessId-eq150-and$script:UidFixtureCase-eq'known-outside-uid'){502L}else{501L}
                 & ${function:ConvertFrom-LifeBsdFacts} @([int]136,[int]0,$ProcessId,[int]1,$uid,$uid,$uid,$seconds,0L) $ProcessId $ExpectedUid
             }
-            'Read-LifePresence'={param($ProcessId)if($script:UidFixtureCase-eq'eperm'){'PRESENT_EPERM'}elseif($script:UidFixtureCase-eq'unknown-presence'){'UNKNOWN'}elseif($script:UidFixtureCase-in@('owner-gone','post-known-survivor','post-java-survivor','dispose-missing','known-reuse')){'MISSING_ESRCH'}else{'PRESENT'}}
+            'Read-LifePresence'={param($ProcessId)$script:UidFixturePresenceCalls++;if($script:UidFixtureCase-eq'eperm'){'PRESENT_EPERM'}elseif($script:UidFixtureCase-eq'unknown-presence'){'UNKNOWN'}elseif($script:UidFixtureCase-in@('owner-gone','post-known-survivor','post-java-survivor','dispose-missing','known-reuse')){'MISSING_ESRCH'}else{'PRESENT'}}
         }
         $script:UidFixtureLookup={
             param($processId)
             $script:UidFixtureLookups+=,$processId
             if($processId-eq100-and$script:UidFixtureCase-in@('owner-gone','post-known-survivor','post-java-survivor')){throw 'MODEL_LOOKUP_UNAVAILABLE'}
-            $created=if($processId-eq200-or($processId-eq150-and$script:UidFixtureCase-eq'known-reuse')){'2026-01-01T00:00:01Z'}elseif($script:UidFixtureCase-eq'equivalent-utc'){'2026-01-01T08:00:00+08:00'}else{'2026-01-01T00:00:00Z'}
-            $exe=switch($processId){10{'/fixture/pwsh'}150{'/fixture/known'}default{'/fixture/jdk25/bin/java'}}
+            $created=if($processId-eq200-or($processId-eq150-and$script:UidFixtureCase-eq'known-reuse')){'2026-01-01T00:00:01Z'}elseif($script:UidFixtureCase-eq'equivalent-utc'){'2026-01-01T08:00:00+08:00'}elseif($script:UidFixtureCase-eq'birth-precision'){'2026-01-01T00:00:00.0000001Z'}else{'2026-01-01T00:00:00Z'}
+            $exe=if($script:UidFixtureCase-eq'invalid-executable'){'relative/SENSITIVE_FIXTURE_ONLY'}else{switch($processId){10{'/fixture/pwsh'}150{'/fixture/known'}default{'/fixture/jdk25/bin/java'}}}
             $obj=[pscustomobject]@{StartTime=[DateTimeOffset]::Parse($created).UtcDateTime;MainModule=[pscustomobject]@{FileName=$exe}}
             if($processId-eq100-and$script:UidFixtureCase-in@('sameuid-unreadable','eperm','unknown-presence','dispose-missing')){$obj|Add-Member StartTime -MemberType ScriptProperty -Value {throw 'MODEL_STARTTIME_UNREADABLE'} -Force}
             $obj|Add-Member Dispose -MemberType ScriptMethod -Value {if($script:UidFixtureCase-eq'dispose-missing'){throw 'MODEL_DISPOSAL_FAILED'}}
@@ -180,8 +181,19 @@ foreach($case in 'valid','equivalent-utc','sameuid-unreadable','eperm','unknown-
     } $case $owner
     $failure=$null;$census=$null
     try{$observation=& $life {param($text,$context,$expected)& ([scriptblock]::Create($text)) -Context $context -Expected $expected -RuntimeApproved} $collector $ctx $owner;$census=& $life.ExportedCommands['ConvertTo-H3911DarwinScopedCensus'] $ctx $owner $observation}catch{$failure=$_.Exception.Message}
-    $mustHold=$case-in@('sameuid-unreadable','eperm','unknown-presence','enum-error','self-uid','self-birth','owner-birth','known-outside-uid','known-reuse','dispose-missing')
+    $mustHold=$case-in@('sameuid-unreadable','eperm','unknown-presence','enum-error','self-uid','self-birth','owner-birth','birth-precision','invalid-executable','unclassified-credential','known-outside-uid','known-reuse','dispose-missing')
     if([bool]$failure-ne$mustHold){throw "Actual UID collector branch unexpected $case : $failure"}
+    $diagnostic=@{
+        'owner-birth'=@('credential-binding','BIRTH_BINDING')
+        'birth-precision'=@('credential-binding','BIRTH_PRECISION')
+        'invalid-executable'=@('identity-shape','EXECUTABLE_PATH')
+        'known-reuse'=@('tracked-identity','KNOWN_IDENTITY')
+        'unclassified-credential'=@('kernel-credential','UNCLASSIFIED')
+    }
+    if($diagnostic.ContainsKey($case)){
+        $expected=$diagnostic[$case];$presenceCalls=& $life {$script:UidFixturePresenceCalls}
+        if($failure-notlike('*phase='+$expected[0]+';*')-or-not$failure.Contains('[invariant='+$expected[1]+']')-or-not$failure.Contains('scanComplete=false')-or$failure.Contains('SENSITIVE_FIXTURE_ONLY')-or$failure-match'[\r\n]'-or$presenceCalls-ne0){throw "Fail-closed bounded census diagnostic differs $case : $failure"}
+    }
     if($case-eq'known-outside-uid'){$lookups=& $life {$script:UidFixtureLookups};if(150-notin$lookups){throw 'Explicit known outside filter was dropped'}}
     if($case-eq'unknown-jdk-replacement'-and$census.sameJdkJava.Count-ne2){throw 'Current unknown JDK replacement was discarded'}
     if($case-in@('owner-gone','post-known-survivor','post-java-survivor')){

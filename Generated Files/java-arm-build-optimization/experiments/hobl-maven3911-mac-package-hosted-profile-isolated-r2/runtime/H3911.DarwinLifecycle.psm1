@@ -264,14 +264,32 @@ function Get-LifeOsProcesses {
             $phase='module-file-name';$executable=$module.FileName;if($null-eq$executable){throw 'Unavailable executable value'}
             $phase='kernel-credential';$semantic=$true
             $credential=& $commands['Read-LifeOwnerCredential'] -ProcessId $id -ExpectedUid $self.uid -RuntimeApproved
-            $phase='identity';$row=@{pid=$id;created=$created;executable=$executable;credential=$credential};Assert-LifeIdentity $row
+            $phase='identity-shape';$row=@{pid=$id;created=$created;executable=$executable;credential=$credential};Assert-LifeIdentity $row
+            $phase='credential-binding'
             & ${function:Assert-LifeCredentialIdentity} $credential $row $self.uid
+            $phase='tracked-identity'
             foreach($known in $tracked){if($known.pid-eq$id){Assert-DarwinLife (Test-LifeSame $known $row) 'Known PID reuse/foreign identity HOLD'}}
             $rows+=,$row
         }
         catch{
             $failed=$true
-            if($semantic-and-not($_.Exception.Message.Contains('[credentialReadUnavailable=true]'))){throw ('HOLD: UID/lifetime invariant [reason=CENSUS_ROW_FAILED;phase='+$phase+';pid='+$pidText+';scanComplete=false]')}
+            if($semantic-and-not($_.Exception.Message.Contains('[credentialReadUnavailable=true]'))){
+                $invariant=switch -CaseSensitive ($_.Exception.Message){
+                    'HOLD: Explicit positive PID identity required'{'PID_SHAPE'}
+                    'HOLD: Explicit ISO creation required'{'CREATION_FORMAT'}
+                    'HOLD: Canonical Darwin path required'{'EXECUTABLE_PATH'}
+                    'HOLD: Typed credential PID/birth identity required'{'CREDENTIAL_IDENTITY_SHAPE'}
+                    'HOLD: Kernel credential facts required'{'CREDENTIAL_FACTS'}
+                    'HOLD: BSD size/PID/parent/expected UID mismatch'{'CREDENTIAL_PID_UID'}
+                    'HOLD: Nonroot real/effective/saved UID invariant required'{'CREDENTIAL_UID'}
+                    'HOLD: BSD birth outside supported range'{'CREDENTIAL_BIRTH_RANGE'}
+                    'HOLD: Kernel microsecond birth cannot bind metadata'{'BIRTH_PRECISION'}
+                    'HOLD: Kernel PID/UID/birth binding mismatch'{'BIRTH_BINDING'}
+                    'HOLD: Known PID reuse/foreign identity HOLD'{'KNOWN_IDENTITY'}
+                    default{'UNCLASSIFIED'}
+                }
+                throw ('HOLD: UID/lifetime invariant [reason=CENSUS_ROW_FAILED;phase='+$phase+';pid='+$pidText+';scanComplete=false] [invariant='+$invariant+']')
+            }
             $rechecks++;try{$presence=& $commands['Read-LifePresence'] -ProcessId ([int]$id) -RuntimeApproved:$RuntimeApproved}catch{$presence='UNKNOWN'}
             $missingConfirmed=$presence-is[string]-and$presence-ceq'MISSING_ESRCH'
             if(-not$missingConfirmed){throw ('HOLD: unreadable/exited/ambiguous native process identity during full census [reason=CENSUS_ROW_FAILED;phase='+$phase+';pid='+$pidText+';scanComplete=false] [presence='+$presence+';missingAtRecheck='+$missing+';presenceAttempts='+$rechecks+']')}
