@@ -8,7 +8,7 @@ function Read-SupJson([string]$Path){
 }
 function Assert-SupBase {
     $manifest=Join-Path $PSScriptRoot 'mac-qualifier-sha256.json'
-    & ${function:Assert-Sup} ((Microsoft.PowerShell.Utility\Get-FileHash $manifest).Hash-ceq'B466B3EC94984ACFF35557E0B68B8BB580730F66F8C9F8168A64C3B52CF64007') 'Frozen Mac source manifest differs'
+    & ${function:Assert-Sup} ((Microsoft.PowerShell.Utility\Get-FileHash $manifest).Hash-ceq'C77308C975C3ED6C15F4B8FCAD5AF689FC491619247DB36DB224175B8D70B13C') 'Frozen Mac source manifest differs'
     $rows=Get-Content $manifest -Raw|ConvertFrom-Json -AsHashtable -DateKind String
     & ${function:Assert-Sup} ($rows-is[array]-and$rows.Count-eq22) 'Exact frozen source closure required'
     foreach($row in $rows){& ${function:Assert-Sup} ($row.file-is[string]-and$row.file-notmatch'[/\\:]|^\.'-and(Microsoft.PowerShell.Utility\Get-FileHash (Join-Path $PSScriptRoot $row.file)).Hash-ceq$row.sha256) 'Frozen Mac payload differs'}
@@ -82,7 +82,7 @@ function Invoke-SupNativeCleanup($R){
     $c=@{Jdk=$R.inputs.Jdk;Home=(Join-Path $R.qualifierOwned 'home');Registry=(Join-Path $R.qualifierOwned 'registry');Temp=(Join-Path $R.qualifierOwned 'temp');Output=(Join-Path $R.owned 'native-cleanup');KnownOwnedIdentities=$R.knownOwnedIdentities;ExpectedJavaSha256='827ECF403DBFA3CF88E7310B44AD93CB27B75C7E15A7E461DDE0CEE775BB196F';ExpectedJcmdSha256='2D4CB05FEFFBB7F81D6EB5295A84D0DA8B9098AC1A0BD9C314B87585E9498C1A'}
     New-Item $c.Output -ItemType Directory -ErrorAction Stop|Out-Null
     $regCmd=& ${function:Get-SupCommand} 'H3911.DarwinOwner.psm1' 'Read-H3911Registry103' 'E9A8FD932AC839119FDD0B810533E8FB69BA314CB038E7345C484A7988A36E1E'
-    $censusCmd=& ${function:Get-SupCommand} 'H3911.DarwinLifecycle.psm1' 'Read-H3911DarwinScopedCensus' '8DFD433F1ED138464CAE9FE19B28DDE0B7A91DD37451733D331C813847B8A9FF'
+    $censusCmd=& ${function:Get-SupCommand} 'H3911.DarwinLifecycle.psm1' 'Read-H3911DarwinScopedCensus' '338A4BBA3F01AD4D53B1E5E5DFCAF55B43C5A1EDF5EB38BB42D8351334378BD0'
     $out=@{status='HOLD';parentAuxiliaryJcmdMaximum=2;parentEffectiveOwnerReads=0;registryEdited=$false;extraMavenCalls=0;historicalDescendantsAbsent=$false}
     try{
         $reg=& $regCmd ([IO.File]::ReadAllBytes((Join-Path $c.Registry 'registry.bin')))
@@ -94,7 +94,7 @@ function Invoke-SupNativeCleanup($R){
             & ${function:Assert-Sup} ($same-is[Management.Automation.FunctionInfo]-and$same.Module.Path-ceq$censusCmd.Module.Path) 'Tracked lifetime comparator origin differs'
             for($i=0;$i-lt$c.KnownOwnedIdentities.Count;$i++){& ${function:Assert-Sup} (& $same $record.knownOwnedIdentities[$i] $c.KnownOwnedIdentities[$i]) 'Returned tracked identity differs'}
             & ${function:Assert-Sup} ($reg.count-eq0) 'Normal registry zero required'
-            $confirm=& ${function:Get-SupCommand} 'H3911.DarwinLifecycle.psm1' 'Confirm-H3911DarwinCliStop' '8DFD433F1ED138464CAE9FE19B28DDE0B7A91DD37451733D331C813847B8A9FF'
+            $confirm=& ${function:Get-SupCommand} 'H3911.DarwinLifecycle.psm1' 'Confirm-H3911DarwinCliStop' '338A4BBA3F01AD4D53B1E5E5DFCAF55B43C5A1EDF5EB38BB42D8351334378BD0'
             $facts=& $confirm -Context $c -Expected $record.owner -StopExit 0 -RuntimeApproved
             & ${function:Assert-Sup} ($facts.status-ceq'NORMAL_CLI_ROUTE_SCOPED_ABSENCE_CONFIRMED') 'Independent normal scoped absence required'
             $out.status='NORMAL_RETURNED_AND_SCOPED_ABSENCE';return $out
@@ -108,7 +108,7 @@ function Invoke-SupNativeCleanup($R){
         $p=[Diagnostics.Process]::GetProcessById([int]$owner.pid)
         try{
             & ${function:Assert-Sup} ($p.Id-eq$owner.pid-and$p.StartTime.ToUniversalTime().Ticks-eq[DateTimeOffset]::Parse($owner.created).UtcDateTime.Ticks-and[string]::Equals($p.MainModule.FileName,$owner.executable,[StringComparison]::Ordinal)) 'Reused/foreign process object; no force'
-            $planCmd=& ${function:Get-SupCommand} 'H3911.DarwinLifecycle.psm1' 'New-H3911DarwinPrivateStopPlan' '8DFD433F1ED138464CAE9FE19B28DDE0B7A91DD37451733D331C813847B8A9FF'
+            $planCmd=& ${function:Get-SupCommand} 'H3911.DarwinLifecycle.psm1' 'New-H3911DarwinPrivateStopPlan' '338A4BBA3F01AD4D53B1E5E5DFCAF55B43C5A1EDF5EB38BB42D8351334378BD0'
             $null=& $planCmd -Context $c -Expected $owner -RuntimeApproved -Emergency
             $p.Kill();& ${function:Assert-Sup} ($p.WaitForExit(5000)) 'Exact owned native exit unconfirmed'
         }finally{$p.Dispose()}

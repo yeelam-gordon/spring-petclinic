@@ -5,7 +5,7 @@ function Get-MQModeContract([ValidateSet('Qualify','PackageScreen',IgnoreCase=$f
 }
 function Get-MQSamplingCommands {
     $path=Join-Path $PSScriptRoot 'H3911.MacPackageSampling.psm1'
-    & ${function:Assert-MQ} ((Microsoft.PowerShell.Utility\Get-FileHash $path).Hash-ceq'D214A345F7AD2B0A9FC7B85C9B795927AE4FA2A37FA1CEFD007EE1EB59141F85') 'Pinned Mac operator differs'
+    & ${function:Assert-MQ} ((Microsoft.PowerShell.Utility\Get-FileHash $path).Hash-ceq'27C51706D7C894626C567DDC10A64933BD2E2050E78BA11CE1235F921A90A2A3') 'Pinned Mac operator differs'
     $m=Import-Module $path -Scope Local -PassThru -DisableNameChecking
     $import=& $m {Get-Command Import-MPackage -CommandType Function}
     & ${function:Assert-MQ} ($import-is[Management.Automation.FunctionInfo]-and$import.Module.Path-ceq$path-and$import.Name-ceq'Import-MPackage') 'Operator import origin differs'
@@ -96,7 +96,7 @@ function New-MQReportByteWitness([string]$CaptureRoot,[string]$Phase){
 }
 function Get-MQRuntimeInputs {
     $path=Join-Path $PSScriptRoot 'H3911.MacRuntimeInputs.psm1'
-    & ${function:Assert-MQ} ((Microsoft.PowerShell.Utility\Get-FileHash $path).Hash-ceq'4B420788E649023771CC59DE0F7C5C67A94E7F19CC57F3EBD4B80E3CFA87BD7F') 'Mac runtime-input leaf differs'
+    & ${function:Assert-MQ} ((Microsoft.PowerShell.Utility\Get-FileHash $path).Hash-ceq'AD7AF1BA1F71F030383CDDAD306EB4F49FD13F1E12A294263D8A3A94F742BE74') 'Mac runtime-input leaf differs'
     $cached=Get-Variable -Name MQRuntimeInputs -Scope Script -ErrorAction SilentlyContinue
     if(-not$cached){
         $m=Import-Module $path -Scope Local -PassThru -DisableNameChecking;$bound=@{}
@@ -165,6 +165,7 @@ function Invoke-H3911MacQualifier {
     if($FixtureOnly){foreach($key in 'Setup','Dispatch','Owner','Census','Stock','Verify','Compare','StopPlan','Stop','Confirm'){& ${function:Assert-MQ} ($FixtureHooks[$key]-is[scriptblock]) 'Complete explicit Mac fixture hooks required'}}
     if($FixtureOnly-and$Mode-ceq'PackageScreen'){& ${function:Assert-MQ} ($FixtureHooks.Sampling-is[hashtable]) 'Explicit native-boundary sampler fixtures required'}
     $commands=& ${function:Import-MQ}
+    if($RuntimeApproved){$null=& ($commands['Get-LifeNativeType']) -RuntimeApproved}
     $samplingCommands=if($Mode-ceq'PackageScreen'){& ${function:Get-MQSamplingCommands}}else{$null}
     & ${function:Assert-MQ} ((Microsoft.PowerShell.Utility\Get-FileHash (Join-Path $PSScriptRoot 'mac-jdk25-identity.json')).Hash-ceq'B4C08E1980A986419E9B402E9DF2B8DBA2C800E62E20995B1C9420EBE031678E') 'Trusted Mac JDK manifest differs'
     $names=@('JAVA_HOME','PATH','MAVEN_USER_HOME','MAVEN_OPTS','MAVEN_ARGS','JAVA_TOOL_OPTIONS','JDK_JAVA_OPTIONS','_JAVA_OPTIONS','MAVEN_SKIP_RC','JAVACMD','MVNW_PREFER_PWSH','MVND_CLIENT','MVND_HOME','MVND_DAEMON_STORAGE','MVND_OPTS','MVND_JVM_ARGS','TMP','TEMP','TMPDIR')

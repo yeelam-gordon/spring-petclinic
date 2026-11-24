@@ -174,7 +174,7 @@ namespace H3911 {
         public static long[] ListOwnUid(uint uid) {
             if (uid == 0) throw new ArgumentOutOfRangeException(nameof(uid)); MacAbi();
             int self = SelfPid(); if (self <= 0 || EffectiveUid() != uid) throw new InvalidOperationException("HOLD: caller UID/PID");
-            int[] mib = new int[] {1,14,5,unchecked((int)uid)}; UIntPtr length = UIntPtr.Zero;
+            int[] mib = new int[4]; mib[0]=1; mib[1]=14; mib[2]=5; mib[3]=unchecked((int)uid); UIntPtr length = UIntPtr.Zero;
             int status = Sysctl(mib,4,IntPtr.Zero,ref length,IntPtr.Zero,UIntPtr.Zero);
             int sizingError = Marshal.GetLastPInvokeError();
             ulong needed = length.ToUInt64();
