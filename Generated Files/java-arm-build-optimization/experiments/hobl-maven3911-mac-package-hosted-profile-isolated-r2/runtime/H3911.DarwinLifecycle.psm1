@@ -35,10 +35,10 @@ function ConvertTo-LifeStartTimeTicks([long]$Seconds,[long]$Microseconds){
     # .NET v10.0.15 Process.OSX.cs StartTimeCore uses this double-valued projection.
     [DateTime]::UnixEpoch.Add([TimeSpan]::FromSeconds([double]$Seconds+([double]$Microseconds/1000000.0))).Ticks
 }
-function Assert-LifeCredentialIdentity($Facts,$Identity,$Uid){
+function Assert-LifeCredentialRecordIdentity($Facts,$Identity){
     Assert-DarwinLife ($Identity-is[hashtable]-and($Identity.pid-is[int]-or$Identity.pid-is[long])-and$Identity.pid-gt0-and$Identity.pid-le[int]::MaxValue-and$Identity.created-is[string]-and$Identity.created-cmatch'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,7})?(?:Z|[+-]\d\d:\d\d)$') 'Typed credential PID/birth identity required'
     Assert-DarwinLife ($Facts-is[hashtable]) 'Kernel credential facts required'
-    $null=& ${function:ConvertFrom-LifeBsdFacts} @([int]136,[int]0,$Facts.pid,$Facts.parentPid,$Facts.realUid,$Facts.effectiveUid,$Facts.savedUid,$Facts.birthSeconds,$Facts.birthMicroseconds) $Identity.pid $Uid
+    $null=& ${function:ConvertFrom-LifeBsdRecord} @([int]136,[int]0,$Facts.pid,$Facts.parentPid,$Facts.realUid,$Facts.effectiveUid,$Facts.savedUid,$Facts.birthSeconds,$Facts.birthMicroseconds) $Identity.pid
     $projected=& ${function:ConvertTo-LifeStartTimeTicks} $Facts.birthSeconds $Facts.birthMicroseconds
     $nativeMicroseconds=[long]$Facts.birthSeconds*1000000L+[long]$Facts.birthMicroseconds
     $previousMicroseconds=0L;$previousSeconds=[Math]::DivRem(($nativeMicroseconds-1L),1000000L,[ref]$previousMicroseconds)
@@ -46,9 +46,40 @@ function Assert-LifeCredentialIdentity($Facts,$Identity,$Uid){
     Assert-DarwinLife (($projected-gt(& ${function:ConvertTo-LifeStartTimeTicks} $previousSeconds $previousMicroseconds))-and($projected-lt(& ${function:ConvertTo-LifeStartTimeTicks} $nextSeconds $nextMicroseconds))) 'Kernel birth projection cannot uniquely bind microseconds'
     Assert-DarwinLife ([DateTimeOffset]::Parse($Identity.created,[Globalization.CultureInfo]::InvariantCulture).UtcTicks-eq$projected) 'Kernel PID/UID/birth binding mismatch'
 }
+function Assert-LifeCredentialIdentity($Facts,$Identity,$Uid){
+    Assert-LifeCredentialRecordIdentity $Facts $Identity
+    $null=& ${function:ConvertFrom-LifeBsdFacts} @([int]136,[int]0,$Facts.pid,$Facts.parentPid,$Facts.realUid,$Facts.effectiveUid,$Facts.savedUid,$Facts.birthSeconds,$Facts.birthMicroseconds) $Identity.pid $Uid
+}
+function New-LifePidSet($Values){
+    Assert-DarwinLife ($Values-is[array]-and$Values.Count-le4096) 'Bounded explicit PID witness array required'
+    $set=[Collections.Generic.HashSet[int]]::new()
+    foreach($value in $Values){Assert-DarwinLife (($value-is[int]-or$value-is[long])-and$value-gt0-and$value-le[int]::MaxValue-and$set.Add([int]$value)) 'Typed unique positive PID witnesses required'}
+    ,$set
+}
+function Test-LifeProtectedPathPid($Context,$Expected,$Self,$Identity){
+    Assert-DarwinLife ($Context.KnownOwnedIdentities-is[array]-and$Self-is[hashtable]-and$Expected-is[hashtable]-and$Identity-is[hashtable]) 'Explicit path/PID scope context required'
+    $pids=@($Self.pid,$Expected.pid)+@($Context.KnownOwnedIdentities|ForEach-Object pid)
+    $set=New-LifePidSet $pids
+    Assert-DarwinLife (($Identity.pid-is[int]-or$Identity.pid-is[long])-and$Identity.pid-gt0-and$Identity.pid-le[int]::MaxValue) 'Typed scope PID required'
+    if($set.Contains([int]$Identity.pid)){return $true}
+    Assert-LifePath $Identity.executable;Assert-LifePath $Context.Jdk
+    [string]::Equals($Identity.executable,($Context.Jdk+'/bin/java'),[StringComparison]::Ordinal)
+}
+function Assert-LifePathPidRow($Context,$Expected,$Self,$Row,$Uid){
+    $protected=Test-LifeProtectedPathPid $Context $Expected $Self $Row
+    Assert-DarwinLife ($Row.protectedPathPid-is[bool]-and$Row.protectedPathPid-eq$protected) 'Recomputed path/PID classification differs'
+    Assert-LifeIdentity $Row
+    Assert-LifeCredentialRecordIdentity $Row.credential $Row
+    Assert-DarwinLife (($Uid-is[int]-or$Uid-is[long])-and$Uid-gt0-and$Uid-le[uint32]::MaxValue-and$Row.credential.effectiveUid-eq$Uid) 'Current effective UID differs from launch actor'
+    if($protected){
+        $null=& ${function:ConvertFrom-LifeBsdFacts} @([int]136,[int]0,$Row.credential.pid,$Row.credential.parentPid,$Row.credential.realUid,$Row.credential.effectiveUid,$Row.credential.savedUid,$Row.credential.birthSeconds,$Row.credential.birthMicroseconds) $Row.pid $Uid @{observed=$Row;self=$Self;expected=$Expected;known=$Context.KnownOwnedIdentities;jdkExecutable=($Context.Jdk+'/bin/java')}
+        foreach($snapshot in @($Self,$Expected)+@($Context.KnownOwnedIdentities)){if($snapshot.pid-eq$Row.pid){Assert-DarwinLife (Test-LifeSame $snapshot $Row) 'Protected PID lifetime/executable changed'}}
+    }
+    $protected
+}
 function Get-LifeUidCommands {
     $map=@{}
-    foreach($name in 'Read-LifeSelfCredential','Read-LifeOwnerCredential','Read-LifeOwnUidPids','Get-LifeCurrent','Read-LifePresence','Read-LifeRegistry'){
+    foreach($name in 'Read-LifeSelfCredential','Read-LifeOwnerCredential','Read-LifeCensusCredential','Read-LifeOwnUidPids','Get-LifeCurrent','Read-LifePresence','Read-LifeRegistry'){
         $command=$ExecutionContext.SessionState.InvokeCommand.GetCommand($name,[Management.Automation.CommandTypes]::Function)
         Assert-DarwinLife ($command-is[Management.Automation.FunctionInfo]-and$command.Module.Path-ceq$ExecutionContext.SessionState.Module.Path) 'Private UID command origin differs';$map[$name]=$command
     };$map
@@ -64,12 +95,47 @@ function Assert-LifeUidCensus($Context,$Expected,$Census){
     Assert-DarwinLife ($Census-is[hashtable]-and$Census.schema-ceq'darwin-launch-uid-java-census-v2'-and$Census.scope-ceq'launch-effective-UID admitted-JDK Java plus explicitly tracked identities'-and$Census.complete-is[bool]-and$Census.complete-and$Census.errors-is[array]-and$Census.errors.Count-eq0-and$Census.expectedIdentityGone-is[bool]) 'Versioned UID scoped census required; no v1 authority'
     $proof=$Census.uidProof
     Assert-DarwinLife ($proof.universalHistory-is[bool]-and-not$proof.universalHistory) 'No universal-history authority'
-    Assert-DarwinLife ($proof-is[hashtable]-and$proof.schema-ceq'darwin-launch-uid-proof-v2'-and$proof.filter-is[int]-and$proof.filter-eq5-and$proof.observationBasis-ceq'INITIAL_ELIGIBLE_PID_NUMBERS_THEN_UID_SURVIVORS_PLUS_KNOWN_ESRCH_RECHECK'-and$proof.atomicEndpoint-is[bool]-and-not$proof.atomicEndpoint-and$proof.newbornCoverage-is[bool]-and-not$proof.newbornCoverage) 'Typed UID observation basis required'
+    Assert-DarwinLife ($proof-is[hashtable]-and$proof.schema-ceq'darwin-launch-uid-proof-v2'-and($proof.filter-is[int]-or$proof.filter-is[long])-and$proof.filter-eq5-and$proof.observationBasis-ceq'EUID_SELECTION_TRACKED_UNION_PATH_PID_SCOPE_V1'-and$proof.atomicEndpoint-is[bool]-and-not$proof.atomicEndpoint-and$proof.newbornCoverage-is[bool]-and-not$proof.newbornCoverage) 'Typed path/PID UID observation basis required'
     & ${function:Assert-LifeCredentialIdentity} $proof.selfCredential $proof.selfIdentity $proof.admittedUid
-    foreach($field in 'selectedPidCount','knownPidCount','unionPidCount','validatedPidCount','missingAtRecheckCount','presenceRecheckAttempts'){Assert-DarwinLife (($proof[$field]-is[int]-or$proof[$field]-is[long])-and$proof[$field]-ge0-and$proof[$field]-le4096) 'Bounded UID accounting required'}
+    Assert-LifeIdentity $proof.selfIdentity
+    foreach($field in 'selectedPidCount','knownPidCount','unionPidCount','validatedPidCount','outsideProtectedPathPidCount','missingAtRecheckCount','presenceRecheckAttempts'){Assert-DarwinLife (($proof[$field]-is[int]-or$proof[$field]-is[long])-and$proof[$field]-ge0-and$proof[$field]-le4096) 'Bounded UID accounting required'}
     Assert-DarwinLife ($proof.knownPidCount-eq(1+$Context.KnownOwnedIdentities.Count)-and$proof.unionPidCount-ge$proof.selectedPidCount-and$proof.unionPidCount-ge$proof.knownPidCount-and$proof.unionPidCount-le($proof.selectedPidCount+$proof.knownPidCount)-and$proof.validatedPidCount+$proof.missingAtRecheckCount-eq$proof.unionPidCount-and$proof.presenceRecheckAttempts-ge$proof.missingAtRecheckCount-and$proof.presenceRecheckAttempts-le$proof.unionPidCount) 'UID union/validation/ESRCH accounting differs'
-    Assert-DarwinLife ($proof.selectedPidCount-gt0) 'Nonempty caller-containing UID selection required'
-    if(-not$Census.expectedIdentityGone){& ${function:Assert-LifeCredentialIdentity} $proof.ownerCredential $Expected $proof.admittedUid}else{Assert-DarwinLife ($null-eq$proof.ownerCredential-and$proof.missingAtRecheckCount-ge1) 'Gone owner requires explicit failed-row ESRCH accounting, not invented credentials'}
+    $selected=New-LifePidSet $proof.selectedPids;$missing=New-LifePidSet $proof.missingAtRecheckPids;$outside=New-LifePidSet $proof.outsideProtectedPathPidPids
+    $known=New-LifePidSet @(@($Expected.pid)+@($Context.KnownOwnedIdentities|ForEach-Object pid))
+    $reserved=New-LifePidSet @(@($proof.selfIdentity.pid)+@($known))
+    $union=[Collections.Generic.HashSet[int]]::new($selected);foreach($id in $known){$null=$union.Add($id)}
+    Assert-DarwinLife ($selected.Count-eq$proof.selectedPidCount-and$known.Count-eq$proof.knownPidCount-and$union.Count-eq$proof.unionPidCount-and$missing.Count-eq$proof.missingAtRecheckCount-and$outside.Count-eq$proof.outsideProtectedPathPidCount-and$selected.Contains([int]$proof.selfIdentity.pid)-and-not$missing.Contains([int]$proof.selfIdentity.pid)) 'UID PID witness accounting differs'
+    foreach($id in $missing){Assert-DarwinLife ($union.Contains($id)) 'Missing PID outside observed union'}
+    foreach($id in $outside){Assert-DarwinLife ($union.Contains($id)-and-not$missing.Contains($id)-and-not$reserved.Contains($id)) 'Outside path/PID witness overlaps protected or missing PID'}
+    Assert-DarwinLife ($Census.sameJdkJava-is[array]-and$Census.knownLive-is[array]-and$Census.tracked-is[array]-and$Census.tracked.Count-eq$known.Count-and[string]::Equals($Census.jdkExecutable,$Expected.executable,[StringComparison]::Ordinal)) 'Typed path/PID census subsets required'
+    $protected=@{};$jdkIds=[Collections.Generic.HashSet[int]]::new();$knownIds=[Collections.Generic.HashSet[int]]::new()
+    $selfRow=@{pid=$proof.selfIdentity.pid;created=$proof.selfIdentity.created;executable=$proof.selfIdentity.executable;credential=$proof.selfCredential;protectedPathPid=$true}
+    foreach($row in @($selfRow)+@($Census.sameJdkJava)+@($Census.knownLive)){
+        Assert-DarwinLife ($row-is[hashtable]-and$row.protectedPathPid-is[bool]-and$row.protectedPathPid-and(Test-LifeProtectedPathPid $Context $Expected $proof.selfIdentity $row)) 'Protected path/PID summary classification differs'
+        Assert-LifeCredentialIdentity $row.credential $row $proof.admittedUid
+        foreach($snapshot in @($proof.selfIdentity,$Expected)+@($Context.KnownOwnedIdentities)){if($snapshot.pid-eq$row.pid){Assert-DarwinLife (Test-LifeSame $snapshot $row) 'Protected PID lifetime/executable changed'}}
+        Assert-DarwinLife ($union.Contains([int]$row.pid)-and-not$missing.Contains([int]$row.pid)-and-not$outside.Contains([int]$row.pid)) 'Protected PID outside live union partition'
+        if($protected.ContainsKey([int]$row.pid)){
+            Assert-DarwinLife (Test-LifeSame $protected[[int]$row.pid] $row) 'Protected summary identity differs'
+            foreach($field in 'pid','parentPid','realUid','effectiveUid','savedUid','birthSeconds','birthMicroseconds'){Assert-DarwinLife ($protected[[int]$row.pid].credential[$field]-eq$row.credential[$field]) 'Protected summary credential differs'}
+        }else{$protected[[int]$row.pid]=$row}
+    }
+    foreach($row in $Census.sameJdkJava){Assert-DarwinLife ([string]::Equals($row.executable,$Census.jdkExecutable,[StringComparison]::Ordinal)-and$jdkIds.Add([int]$row.pid)) 'Exact unique admitted-JDK path subset required'}
+    foreach($row in $Census.knownLive){Assert-DarwinLife ($known.Contains([int]$row.pid)-and$knownIds.Add([int]$row.pid)) 'Exact unique tracked PID subset required'}
+    foreach($row in $protected.Values){Assert-DarwinLife ((-not$known.Contains([int]$row.pid)-or$knownIds.Contains([int]$row.pid))-and(-not[string]::Equals($row.executable,$Census.jdkExecutable,[StringComparison]::Ordinal)-or$jdkIds.Contains([int]$row.pid))) 'Protected subset row omitted'}
+    foreach($id in $known){Assert-DarwinLife ($protected.ContainsKey($id)-or$missing.Contains($id)) 'Tracked PID missing without ESRCH witness'}
+    Assert-DarwinLife ($protected.Count+$outside.Count-eq$proof.validatedPidCount-and$protected.Count+$outside.Count+$missing.Count-eq$union.Count-and$Census.expectedIdentityGone-eq(-not$protected.ContainsKey([int]$Expected.pid))) 'Complete protected/outside/missing partition required'
+    if(-not$Census.expectedIdentityGone){
+        & ${function:Assert-LifeCredentialIdentity} $proof.ownerCredential $Expected $proof.admittedUid
+        foreach($field in 'pid','parentPid','realUid','effectiveUid','savedUid','birthSeconds','birthMicroseconds'){Assert-DarwinLife ($proof.ownerCredential[$field]-eq$protected[[int]$Expected.pid].credential[$field]) 'Owner credential witness differs'}
+    }else{Assert-DarwinLife ($null-eq$proof.ownerCredential-and$missing.Contains([int]$Expected.pid)) 'Gone owner requires explicit failed-row ESRCH accounting, not invented credentials'}
+}
+function Assert-LifeReturnedUidProof($Context,$Expected,$Proof,[bool]$ExpectedGone){
+    Assert-DarwinLife ($Proof-is[hashtable]) 'Returned UID proof required'
+    $live=@()
+    if(-not$ExpectedGone){$row=$Expected.Clone();$row.credential=$Proof.ownerCredential;$row.protectedPathPid=$true;$live=@($row)}
+    $census=@{schema='darwin-launch-uid-java-census-v2';scope='launch-effective-UID admitted-JDK Java plus explicitly tracked identities';complete=$true;errors=@();expectedIdentityGone=$ExpectedGone;uidProof=$Proof;jdkExecutable=$Expected.executable;tracked=@($Expected)+@($Context.KnownOwnedIdentities);sameJdkJava=$live;knownLive=$live}
+    Assert-LifeUidCensus $Context $Expected $census
 }
 function New-H3911DarwinStopPlanFacts {
     param([hashtable]$Context,[hashtable]$Expected,[hashtable]$Registry,[hashtable]$Current,[switch]$Emergency)
@@ -84,17 +150,22 @@ function ConvertTo-H3911DarwinScopedCensus {
     param([hashtable]$Context,[hashtable]$Expected,[hashtable]$Observation)
     Assert-LifeContext $Context $Expected
     Assert-DarwinLife ($Observation-is[hashtable]-and$Observation.complete-is[bool]-and$Observation.complete-and$Observation.ContainsKey('errors')-and$Observation.errors-is[array]-and$Observation.errors.Count-eq0-and$Observation.ContainsKey('processes')-and$Observation.processes-is[array]) 'Explicit complete enumeration/error/process arrays required'
+    $uid=$Observation.schema-ceq'darwin-launch-uid-observation-v2';$outside=[Collections.Generic.HashSet[int]]::new()
+    if($Observation.ContainsKey('schema')){Assert-DarwinLife $uid 'Unknown census observation contract'}
+    if($uid){Assert-DarwinLife ($Observation.uidProof-is[hashtable]-and$Observation.uidProof.observationBasis-ceq'EUID_SELECTION_TRACKED_UNION_PATH_PID_SCOPE_V1'-and$Observation.processes.Count-le4096) 'Path/PID observation contract required'}
     $java=$Context.Jdk+'/bin/java';$sameJdk=@();$knownLive=@();$tracked=@($Expected)+@($Context.KnownOwnedIdentities);$seen=[Collections.Generic.HashSet[int]]::new()
     foreach($identity in $Observation.processes){
-        Assert-LifeIdentity $identity;Assert-DarwinLife ($seen.Add([int]$identity.pid)) 'Duplicate enumerated PID'
+        if($uid){$protected=Assert-LifePathPidRow $Context $Expected $Observation.uidProof.selfIdentity $identity $Observation.uidProof.admittedUid;if(-not$protected){$null=$outside.Add([int]$identity.pid)}}else{Assert-LifeIdentity $identity}
+        Assert-DarwinLife ($seen.Add([int]$identity.pid)) 'Duplicate enumerated PID'
         if([string]::Equals($identity.executable,$java,[StringComparison]::Ordinal)){$sameJdk+=,$identity}
         foreach($known in $tracked){if($known.pid-eq$identity.pid-and(Test-LifeCreationInstant $known.created $identity.created)){$knownLive+=,$identity}}
     }
     $expectedLive=@($knownLive|Where-Object pid -eq $Expected.pid)
     $result=@{schema='darwin-scoped-java-census-v1';complete=$true;errors=@();jdkExecutable=$java;sameJdkJava=$sameJdk;knownLive=$knownLive;expectedIdentityGone=($expectedLive.Count-eq0);tracked=$tracked;evidenceKind='validated-census-model';scope='all admitted-JDK Java plus explicitly tracked PID/create identities; not universal historical descendants'}
-    if($Observation.schema-ceq'darwin-launch-uid-observation-v2'){
+    if($uid){
         Assert-DarwinLife ($Observation.processes.Count-eq$Observation.uidProof.validatedPidCount) 'Validated row accounting differs'
-        foreach($row in $Observation.processes){& ${function:Assert-LifeCredentialIdentity} $row.credential $row $Observation.uidProof.admittedUid;foreach($known in $tracked){if($row.pid-eq$known.pid){Assert-DarwinLife (Test-LifeSame $known $row) 'Known PID reuse/foreign identity HOLD'}}}
+        $outsideWitness=New-LifePidSet $Observation.uidProof.outsideProtectedPathPidPids
+        Assert-DarwinLife ($outside.Count-eq$Observation.uidProof.outsideProtectedPathPidCount-and$outside.SetEquals($outsideWitness)) 'Recomputed outside path/PID accounting differs'
         $result.schema='darwin-launch-uid-java-census-v2';$result.scope='launch-effective-UID admitted-JDK Java plus explicitly tracked identities';$result.uidProof=$Observation.uidProof;$result.evidenceKind='validated-uid-census-model'
         & ${function:Assert-LifeUidCensus} $Context $Expected $result
     };$result
@@ -250,10 +321,18 @@ function Get-LifeRejectedCredentialScope($Wire,$ExpectedPid,[hashtable]$Context)
     }catch{}
     $tags
 }
-function ConvertFrom-LifeBsdFacts($Wire,$ExpectedPid,$ExpectedUid,[hashtable]$FailureContext){
+function ConvertFrom-LifeBsdRecord($Wire,$ExpectedPid){
     Assert-DarwinLife ($Wire-is[array]-and$Wire.Count-in@(9,11)) 'Exact BSD fact wire required'
     foreach($n in $Wire){Assert-DarwinLife (($n-is[int]-or$n-is[long])) 'Integer BSD facts required'}
-    Assert-DarwinLife (($ExpectedPid-is[int]-or$ExpectedPid-is[long])-and$ExpectedPid-gt0-and$ExpectedPid-le[int]::MaxValue-and($ExpectedUid-is[int]-or$ExpectedUid-is[long])-and$ExpectedUid-gt0-and$ExpectedUid-le[uint32]::MaxValue-and$Wire[0]-eq136-and$Wire[2]-eq$ExpectedPid-and$Wire[3]-ge0-and$Wire[3]-le[int]::MaxValue) 'BSD size/PID/parent/expected UID mismatch'
+    Assert-DarwinLife (($ExpectedPid-is[int]-or$ExpectedPid-is[long])-and$ExpectedPid-gt0-and$ExpectedPid-le[int]::MaxValue-and$Wire[0]-eq136-and$Wire[2]-eq$ExpectedPid-and$Wire[3]-ge0-and$Wire[3]-le[int]::MaxValue) 'BSD size/PID/parent/expected UID mismatch'
+    foreach($index in 4,5,6){Assert-DarwinLife ($Wire[$index]-ge0-and$Wire[$index]-le[uint32]::MaxValue) 'Kernel credential UID representation invalid'}
+    Assert-DarwinLife ($Wire[7]-gt0-and$Wire[7]-le253402300799-and$Wire[8]-ge0-and$Wire[8]-le999999) 'BSD birth outside supported range'
+    if($Wire.Count-eq11){foreach($index in 9,10){Assert-DarwinLife ($Wire[$index]-ge0-and$Wire[$index]-le[uint32]::MaxValue) 'Kernel credential UID representation invalid'}}
+    @{pid=[int]$Wire[2];parentPid=[int]$Wire[3];realUid=$Wire[4];effectiveUid=$Wire[5];savedUid=$Wire[6];birthSeconds=$Wire[7];birthMicroseconds=$Wire[8]}
+}
+function ConvertFrom-LifeBsdFacts($Wire,$ExpectedPid,$ExpectedUid,[hashtable]$FailureContext){
+    $facts=ConvertFrom-LifeBsdRecord $Wire $ExpectedPid
+    Assert-DarwinLife (($ExpectedUid-is[int]-or$ExpectedUid-is[long])-and$ExpectedUid-gt0-and$ExpectedUid-le[uint32]::MaxValue) 'BSD size/PID/parent/expected UID mismatch'
     try{foreach($index in 4,5,6){Assert-DarwinLife ($Wire[$index]-eq$ExpectedUid) 'Nonroot real/effective/saved UID invariant required'}}
     catch{
         # Real/effective/saved: match, zero, other uint32, invalid; never emit raw credential values.
@@ -262,9 +341,8 @@ function ConvertFrom-LifeBsdFacts($Wire,$ExpectedPid,$ExpectedUid,[hashtable]$Fa
         try{$scope=& ${function:Get-LifeRejectedCredentialScope} $Wire $ExpectedPid $FailureContext}catch{}
         throw ('HOLD: Nonroot real/effective/saved UID invariant required [uidComparison='+$uidComparison+'] [pidScope='+$scope.pidScope+'] [exeScope='+$scope.exeScope+'] [birthBinding='+$scope.birthBinding+']')
     }
-    Assert-DarwinLife ($Wire[7]-gt0-and$Wire[7]-le253402300799-and$Wire[8]-ge0-and$Wire[8]-le999999) 'BSD birth outside supported range'
     if($Wire.Count-eq11){Assert-DarwinLife ($Wire[9]-eq$ExpectedUid-and$Wire[10]-eq$ExpectedUid) 'getuid/geteuid/kernel disagreement'}
-    @{pid=[int]$Wire[2];parentPid=[int]$Wire[3];realUid=$Wire[4];effectiveUid=$Wire[5];savedUid=$Wire[6];birthSeconds=$Wire[7];birthMicroseconds=$Wire[8]}
+    $facts
 }
 function Assert-LifeCredentialBinding($Facts,$ExpectedPid,$ExpectedUid,$Seconds,$Microseconds){
     Assert-DarwinLife (($ExpectedPid-is[int]-or$ExpectedPid-is[long])-and($ExpectedUid-is[int]-or$ExpectedUid-is[long])-and($Seconds-is[int]-or$Seconds-is[long])-and($Microseconds-is[int]-or$Microseconds-is[long])-and$Facts.pid-eq$ExpectedPid-and$Facts.effectiveUid-eq$ExpectedUid-and$Facts.birthSeconds-eq$Seconds-and$Facts.birthMicroseconds-eq$Microseconds) 'Kernel PID/UID/birth binding mismatch'
@@ -287,6 +365,11 @@ function Read-LifeOwnerCredential([ValidateRange(1,2147483647)][int]$ProcessId,[
     try{$wire=$type::ReadBsd($ProcessId)}catch{throw 'HOLD: kernel credential read unavailable [credentialReadUnavailable=true]'}
     & ${function:ConvertFrom-LifeBsdFacts} $wire $ProcessId $ExpectedUid $FailureContext
 }
+function Read-LifeCensusCredential([ValidateRange(1,2147483647)][int]$ProcessId,[switch]$RuntimeApproved){
+    $type=& ${function:Get-LifeNativeType} -RuntimeApproved:$RuntimeApproved
+    try{$wire=$type::ReadBsd($ProcessId)}catch{throw 'HOLD: kernel credential read unavailable [credentialReadUnavailable=true]'}
+    & ${function:ConvertFrom-LifeBsdRecord} $wire $ProcessId
+}
 function Read-LifeOwnUidPids([ValidateRange(1,4294967295)][long]$ExpectedUid,[switch]$RuntimeApproved){
     $type=& ${function:Get-LifeNativeType} -RuntimeApproved:$RuntimeApproved;$wire=$type::ListOwnUid([uint32]$ExpectedUid)
     & ${function:ConvertFrom-LifeUidPidFacts} $wire $ExpectedUid $wire[2]
@@ -297,10 +380,10 @@ function Get-LifeOsProcesses {
     Assert-LifeContext $Context $Expected
     $commands=& ${function:Get-LifeUidCommands};$self=& ${function:Read-LifeUidSelf} $commands
     $selection=& $commands['Read-LifeOwnUidPids'] -ExpectedUid $self.uid -RuntimeApproved
-    $tracked=@($Expected)+@($Context.KnownOwnedIdentities);$all=[Collections.Generic.HashSet[int]]::new()
-    foreach($id in $selection.pids){$null=$all.Add([int]$id)};foreach($known in $tracked){$null=$all.Add([int]$known.pid)}
+    $tracked=@($Expected)+@($Context.KnownOwnedIdentities);$selected=New-LifePidSet $selection.pids;$all=[Collections.Generic.HashSet[int]]::new($selected)
+    foreach($known in $tracked){$null=$all.Add([int]$known.pid)}
     Assert-DarwinLife ($all.Count-le4096) 'UID union exceeds bounded census'
-    $rows=@();$rechecks=0;$missing=0
+    $rows=@();$rechecks=0;$missing=0;$missingPids=@();$outsidePids=@()
     foreach($id in $all){
         $p=$null;$phase='lookup';$pidText=$id.ToString([Globalization.CultureInfo]::InvariantCulture);$failed=$false;$missingConfirmed=$false;$presence='NOT_ATTEMPTED';$semantic=$false
         try{
@@ -308,13 +391,14 @@ function Get-LifeOsProcesses {
             $phase='start-time';$created=$p.StartTime.ToUniversalTime().ToString('o')
             $phase='main-module';$module=$p.MainModule;if($null-eq$module){throw 'Unavailable module value'}
             $phase='module-file-name';$executable=$module.FileName;if($null-eq$executable){throw 'Unavailable executable value'}
-            $phase='kernel-credential';$semantic=$true
-            $credential=& $commands['Read-LifeOwnerCredential'] -ProcessId $id -ExpectedUid $self.uid -RuntimeApproved -FailureContext @{observed=@{pid=$id;created=$created;executable=$executable};self=$self.identity;expected=$Expected;known=$Context.KnownOwnedIdentities;jdkExecutable=($Context.Jdk+'/bin/java')}
-            $phase='identity-shape';$row=@{pid=$id;created=$created;executable=$executable;credential=$credential};Assert-LifeIdentity $row
+            $phase='path-pid-scope';$semantic=$true
+            $row=@{pid=$id;created=$created;executable=$executable}
+            $row.protectedPathPid=Test-LifeProtectedPathPid $Context $Expected $self.identity $row
+            $phase='kernel-credential'
+            $row.credential=& $commands['Read-LifeCensusCredential'] -ProcessId $id -RuntimeApproved
             $phase='credential-binding'
-            & ${function:Assert-LifeCredentialIdentity} $credential $row $self.uid
-            $phase='tracked-identity'
-            foreach($known in $tracked){if($known.pid-eq$id){Assert-DarwinLife (Test-LifeSame $known $row) 'Known PID reuse/foreign identity HOLD'}}
+            $protected=Assert-LifePathPidRow $Context $Expected $self.identity $row $self.uid
+            if(-not$protected){$outsidePids+=,[int]$id}
             $rows+=,$row
         }
         catch{
@@ -326,6 +410,10 @@ function Get-LifeOsProcesses {
                     'HOLD: Canonical Darwin path required'{'EXECUTABLE_PATH'}
                     'HOLD: Typed credential PID/birth identity required'{'CREDENTIAL_IDENTITY_SHAPE'}
                     'HOLD: Kernel credential facts required'{'CREDENTIAL_FACTS'}
+                    'HOLD: Kernel credential UID representation invalid'{'CREDENTIAL_REPRESENTATION'}
+                    'HOLD: Current effective UID differs from launch actor'{'CREDENTIAL_EUID'}
+                    'HOLD: Recomputed path/PID classification differs'{'PATH_PID_SCOPE'}
+                    'HOLD: Protected PID lifetime/executable changed'{'KNOWN_IDENTITY'}
                     'HOLD: BSD size/PID/parent/expected UID mismatch'{'CREDENTIAL_PID_UID'}
                     'HOLD: Nonroot real/effective/saved UID invariant required'{'CREDENTIAL_UID'}
                     'HOLD: BSD birth outside supported range'{'CREDENTIAL_BIRTH_RANGE'}
@@ -349,10 +437,10 @@ function Get-LifeOsProcesses {
             if(-not$missingConfirmed){throw ('HOLD: unreadable/exited/ambiguous native process identity during full census [reason=CENSUS_ROW_FAILED;phase='+$phase+';pid='+$pidText+';scanComplete=false] [presence='+$presence+';missingAtRecheck='+$missing+';presenceAttempts='+$rechecks+']')}
         }
         finally{if($p){try{$p.Dispose()}catch{if($missingConfirmed){throw ('HOLD: census read and disposal failed [reason=CENSUS_ROW_FAILED;phase='+$phase+';pid='+$pidText+';scanComplete=false] [presence=MISSING_ESRCH;dispose=failed;missingAtRecheck='+$missing+';presenceAttempts='+$rechecks+']')};if(-not$failed){throw ('HOLD: native process disposal failed [reason=CENSUS_DISPOSE_FAILED;phase=dispose;pid='+$pidText+';scanComplete=false] [missingAtRecheck='+$missing+';presenceAttempts='+$rechecks+']')}}}}
-        if($missingConfirmed){$missing++}
+        if($missingConfirmed){$missing++;$missingPids+=,[int]$id}
     }
     $ownerCredential=@($rows|Where-Object pid -eq $Expected.pid|ForEach-Object credential)
-    $proof=@{schema='darwin-launch-uid-proof-v2';admittedUid=$self.uid;filter=5;selfIdentity=$self.identity;selfCredential=$self.credential;ownerCredential=$(if($ownerCredential.Count-eq1){$ownerCredential[0]}else{$null});selectedPidCount=$selection.pids.Count;knownPidCount=$tracked.Count;unionPidCount=$all.Count;validatedPidCount=$rows.Count;missingAtRecheckCount=$missing;presenceRecheckAttempts=$rechecks;observationBasis='INITIAL_ELIGIBLE_PID_NUMBERS_THEN_UID_SURVIVORS_PLUS_KNOWN_ESRCH_RECHECK';atomicEndpoint=$false;newbornCoverage=$false}
+    $proof=@{schema='darwin-launch-uid-proof-v2';admittedUid=$self.uid;filter=5;selfIdentity=$self.identity;selfCredential=$self.credential;ownerCredential=$(if($ownerCredential.Count-eq1){$ownerCredential[0]}else{$null});selectedPids=@($selection.pids);missingAtRecheckPids=$missingPids;outsideProtectedPathPidPids=$outsidePids;selectedPidCount=$selected.Count;knownPidCount=$tracked.Count;unionPidCount=$all.Count;validatedPidCount=$rows.Count;outsideProtectedPathPidCount=$outsidePids.Count;missingAtRecheckCount=$missing;presenceRecheckAttempts=$rechecks;observationBasis='EUID_SELECTION_TRACKED_UNION_PATH_PID_SCOPE_V1';atomicEndpoint=$false;newbornCoverage=$false}
     $proof.universalHistory=$false
     @{schema='darwin-launch-uid-observation-v2';complete=$true;errors=@();processes=$rows;uidProof=$proof}
 }
@@ -432,6 +520,7 @@ function Confirm-H3911DarwinCliStop {
     $census=& ($ExecutionContext.SessionState.Module.ExportedCommands['Read-H3911DarwinScopedCensus']) $Context $Expected -RuntimeApproved
     & ${function:Assert-LifeUidCensus} $Context $Expected $census
     Assert-DarwinLife ($Expected.launchUidAdmission-is[hashtable]-and$Expected.launchUidAdmission.schema-cin@('darwin-launch-uid-proof-v2','darwin-launch-uid-live-admission-v2')-and$Expected.launchUidAdmission.admittedUid-eq$census.uidProof.admittedUid) 'Prior actual live-owner UID admission required after exit'
+    if($Expected.launchUidAdmission.schema-ceq'darwin-launch-uid-proof-v2'){Assert-DarwinLife ($Expected.launchUidAdmission.observationBasis-ceq'EUID_SELECTION_TRACKED_UNION_PATH_PID_SCOPE_V1') 'Prior live census path/PID contract differs'}
     & ${function:Assert-LifeCredentialIdentity} $Expected.launchUidAdmission.ownerCredential $Expected $census.uidProof.admittedUid
     try{$result=& ($ExecutionContext.SessionState.Module.ExportedCommands['Confirm-H3911DarwinAbsenceFacts']) $Context $Expected $snapshot.registry $census $StopExit -Forced:$Forced -Emergency:$Emergency}
     catch{throw ($_.ToString()+' [observationBasis='+$census.uidProof.observationBasis+';missingAtRecheck='+$census.uidProof.missingAtRecheckCount+';presenceAttempts='+$census.uidProof.presenceRecheckAttempts+']')}

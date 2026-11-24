@@ -46,7 +46,7 @@ function Assert-H3911MacHostedSource([string]$SourceRoot){
     & ${function:Assert-Hosted} ($actual.Count-eq$names.Count) 'Unadmitted source role/count'
     foreach($file in $actual){$name=[IO.Path]::GetRelativePath($SourceRoot,$file.FullName).Replace([IO.Path]::DirectorySeparatorChar,[char]47);& ${function:Assert-Hosted} ($name-cin$names) 'Unadmitted source role'}
     $pins=Join-Path $SourceRoot 'runtime-pins.json'
-    & ${function:Assert-Hosted} ((Microsoft.PowerShell.Utility\Get-FileHash $pins).Hash-ceq'5A920C9EF20EB842B56CF1ACD1CF518FBF6CFEC1652658172B6626B79E12985F') 'Closed hosted runtime manifest differs'
+    & ${function:Assert-Hosted} ((Microsoft.PowerShell.Utility\Get-FileHash $pins).Hash-ceq'CACB3CDABA50B9BADF28CFFDA5ACC603F5821A6F6C151782E57F122406C6D53B') 'Closed hosted runtime manifest differs'
     $rows=Get-Content $pins -Raw|ConvertFrom-Json -AsHashtable -DateKind String
     & ${function:Assert-Hosted} ($rows.Count-eq26) 'Exact required runtime/source-identity closure required'
     foreach($row in $rows){
@@ -172,11 +172,12 @@ function Get-HostedCaptureBinding([string]$SourceRoot,[string]$RunRoot,[string]$
 function Get-HostedPackageBindings([string]$SourceRoot,[string]$RunRoot,[string]$Project){
     $r=Get-Content (& ${function:Get-HostedRegular} $RunRoot 'qualification/mac-qualifier.json').FullName -Raw|ConvertFrom-Json -AsHashtable -DateKind String
     & ${function:Assert-Hosted} ($r.mode-is[string]-and$r.mode-ceq'PackageScreen'-and$r.contexts-is[hashtable]-and$r.contexts.Count-eq5-and$r.sampling-is[hashtable]) 'Explicit complete PackageScreen record required'
+    & ${function:Assert-Hosted} ($r.knownOwnedIdentities-is[array]) 'Recorded tracked identity set required for returned sampling'
     $expected=(& ${function:Get-H3911MacHostedContract} ([IO.Path]::GetPathRoot($RunRoot)) PackageScreen).modeContract
     & ${function:Assert-HostedContract} $r.contract $expected
     & ${function:Assert-Hosted} ($Project-and$r.contexts['baseline-project'].value-ceq$Project-and$r.contexts['daemon-project'].value-ceq$Project) 'Caller project contexts differ'
     $owned=Join-Path $RunRoot 'qualification'
-    $c=@{Output=(Join-Path $owned 'output');Project=$Project;Jdk=$r.contexts['daemon-home'].value;Home=(Join-Path $owned 'home');Registry=(Join-Path $owned 'registry');Temp=(Join-Path $owned 'temp');Cache=(Join-Path $owned 'cache');Settings=(Join-Path $owned 'settings.xml');ScreenOwner=$r.owner;ScreenNotBefore=$r.screenNotBefore;Calls=$r.calls;SourceProfile='MacOriginalWrapper';FixtureOnly=$false}
+    $c=@{Output=(Join-Path $owned 'output');Project=$Project;Jdk=$r.contexts['daemon-home'].value;Home=(Join-Path $owned 'home');Registry=(Join-Path $owned 'registry');Temp=(Join-Path $owned 'temp');Cache=(Join-Path $owned 'cache');Settings=(Join-Path $owned 'settings.xml');ScreenOwner=$r.owner;ScreenNotBefore=$r.screenNotBefore;Calls=$r.calls;KnownOwnedIdentities=$r.knownOwnedIdentities;ScreenVerification=@{baseline=$r['baseline-verify'];candidate=$r['candidate-verify']};SourceProfile='MacOriginalWrapper';FixtureOnly=$false}
     $m=Import-Module (Join-Path $SourceRoot 'runtime/H3911.MacQualifier.psm1') -Scope Local -PassThru
     $commands=& $m {Get-MQSamplingCommands};$validate=& $m {Get-Command Assert-MQSamplingEvidence -CommandType Function}
     $null=& $validate $c $r.sampling ([bool]$r.sampling.fixtureOnly)

@@ -11,7 +11,7 @@ function Import-H3911MacRuntimeInputs {
         'H3911.Darwin103.psm1'=@('05F80C9435B3E6012FAE8874A887A7F96AF8B44311EC1D4A06265ED254E7A264',@('Assert-H3911Darwin103Distribution'))
         'H3911.StockMaven3911.psm1'=@('3D8DCF80AFF694FDC716122B2E76274BBB2D5FD7D882C7D04DC61DE5EF55911D',@('Assert-H3911StockMaven3911'))
         'H3911.EffectiveOwner.psm1'=@('4979E2E0160A6DCF9C7B13E279DA712F047634AABB7F3CB021C2A25578CF7B95',@('Read-H3911DarwinEffectiveOwner'))
-        'H3911.DarwinLifecycle.psm1'=@('88E20377D79FDB071C2398140FA49AE09841C483CB4937D4F2D74CF93DBF726F',@('New-H3911DarwinPrivateStopPlan','Confirm-H3911DarwinCliStop','Read-H3911DarwinScopedCensus'))}
+        'H3911.DarwinLifecycle.psm1'=@('57D38FDC729259067C328DE6A59C9EBE4DDE52A7EC582E5CCBF7EC0009C3E109',@('New-H3911DarwinPrivateStopPlan','Confirm-H3911DarwinCliStop','Read-H3911DarwinScopedCensus'))}
     $bound=@{}
     foreach($row in $spec.GetEnumerator()){
         $path=Join-Path $PSScriptRoot $row.Key
@@ -20,6 +20,7 @@ function Import-H3911MacRuntimeInputs {
         foreach($name in $row.Value[1]){$command=$m.ExportedCommands[$name];& ${function:Assert-MacRuntimeInput} ($command-is[Management.Automation.FunctionInfo]-and$command.Module.Path-ceq$path-and$command.Name-ceq$name) 'Mac command object origin differs';$bound[$name]=$command}
         if($row.Key-ceq'H3911.DarwinLifecycle.psm1'){$same=& $m {Get-Command Test-LifeSame -CommandType Function};& ${function:Assert-MacRuntimeInput} ($same-is[Management.Automation.FunctionInfo]-and$same.Module.Path-ceq$path-and$same.Name-ceq'Test-LifeSame') 'Lifecycle identity comparison origin differs';$bound['Test-LifeSame']=$same}
         if($row.Key-ceq'H3911.DarwinLifecycle.psm1'){$proof=& $m {Get-Command Assert-LifeUidCensus -CommandType Function};& ${function:Assert-MacRuntimeInput} ($proof-is[Management.Automation.FunctionInfo]-and$proof.Module.Path-ceq$path) 'UID census predicate origin differs';$bound['Assert-LifeUidCensus']=$proof}
+        if($row.Key-ceq'H3911.DarwinLifecycle.psm1'){$returned=& $m {Get-Command Assert-LifeReturnedUidProof -CommandType Function};& ${function:Assert-MacRuntimeInput} ($returned-is[Management.Automation.FunctionInfo]-and$returned.Module.Path-ceq$path-and$returned.Name-ceq'Assert-LifeReturnedUidProof') 'Returned UID proof predicate origin differs';$bound['Assert-LifeReturnedUidProof']=$returned}
         if($row.Key-ceq'H3911.DarwinLifecycle.psm1'){$origin=& $m {Get-Command Get-LifeNativeType -CommandType Function};& ${function:Assert-MacRuntimeInput} ($origin-is[Management.Automation.FunctionInfo]-and$origin.Module.Path-ceq$path-and$origin.Name-ceq'Get-LifeNativeType') 'Native type predicate origin differs';$bound['Get-LifeNativeType']=$origin}
     }
     $bound

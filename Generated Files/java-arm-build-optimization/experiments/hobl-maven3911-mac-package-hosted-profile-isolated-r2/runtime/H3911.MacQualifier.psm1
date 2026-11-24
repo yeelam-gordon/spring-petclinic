@@ -5,7 +5,7 @@ function Get-MQModeContract([ValidateSet('Qualify','PackageScreen',IgnoreCase=$f
 }
 function Get-MQSamplingCommands {
     $path=Join-Path $PSScriptRoot 'H3911.MacPackageSampling.psm1'
-    & ${function:Assert-MQ} ((Microsoft.PowerShell.Utility\Get-FileHash $path).Hash-ceq'9631B4240794895910CDA719CFBCA715CC050274A9515F944FF5237F93B9D85B') 'Pinned Mac operator differs'
+    & ${function:Assert-MQ} ((Microsoft.PowerShell.Utility\Get-FileHash $path).Hash-ceq'1391A969BCE0F0536457A9BCD829E16ED51FFB55046110E4D1CEE962F540DA5B') 'Pinned Mac operator differs'
     $m=Import-Module $path -Scope Local -PassThru -DisableNameChecking
     $import=& $m {Get-Command Import-MPackage -CommandType Function}
     & ${function:Assert-MQ} ($import-is[Management.Automation.FunctionInfo]-and$import.Module.Path-ceq$path-and$import.Name-ceq'Import-MPackage') 'Operator import origin differs'
@@ -18,6 +18,10 @@ function Get-MQSamplingCommands {
 function Assert-MQSamplingEvidence($C,$Sampling,[bool]$FixtureOnly){
     & ${function:Assert-MQ} ($Sampling-is[hashtable]-and$Sampling.status-is[string]-and$Sampling.status-ceq'OPERATOR_COMPLETE_CALLER_STOP_STILL_REQUIRED'-and$Sampling.fixtureOnly-is[bool]-and$Sampling.fixtureOnly-eq$FixtureOnly-and$Sampling.clientCalls-is[array]-and$Sampling.clientCalls.Count-eq16-and$Sampling.offlineCaptures-is[array]-and$Sampling.offlineCaptures.Count-eq8-and$Sampling.samples-is[array]-and$Sampling.samples.Count-eq6-and$Sampling.auxiliaryLedger-is[array]-and$Sampling.auxiliaryLedger.Count-eq28-and($Sampling.actualMainAuxCount-is[int]-or$Sampling.actualMainAuxCount-is[long])-and$Sampling.actualMainAuxCount-eq28-and$Sampling.callerStateEqual-is[bool]-and$Sampling.callerStateEqual) 'Typed complete Mac sampling return required'
     $commands=& ${function:Get-MQSamplingCommands};$plan=& $commands['Get-H3911RetainedProtocol'] -Mode PackageScreen -Platform MacOS;$steps=@($plan.calls|Where-Object {$_.kind-in@('clean','package')})
+    foreach($census in @($Sampling.boundary,$Sampling.finalCensus)){
+        $null=& $commands['Assert-LifeUidCensus'] $C $C.ScreenOwner $census
+        & ${function:Assert-MQ} (-not$census.expectedIdentityGone-and$census.sameJdkJava.Count-eq1-and$census.knownLive.Count-eq1) 'Returned sampling census must retain the single live owner scope'
+    }
     if(-not$FixtureOnly){
         foreach($pair in @(@('baseline-verify','baseline'),@('candidate-verify','candidate'))){$null=& $commands['Assert-PScreenFullGate'] $C $commands $pair[0] $C.ScreenVerification[$pair[1]]}
         $null=& $commands['Compare-H3911Artifacts'] (Join-Path $C.Output 'baseline-verify') (Join-Path $C.Output 'candidate-verify') -SourceProfile MacOriginalWrapper
@@ -96,7 +100,7 @@ function New-MQReportByteWitness([string]$CaptureRoot,[string]$Phase){
 }
 function Get-MQRuntimeInputs {
     $path=Join-Path $PSScriptRoot 'H3911.MacRuntimeInputs.psm1'
-    & ${function:Assert-MQ} ((Microsoft.PowerShell.Utility\Get-FileHash $path).Hash-ceq'6DE8EF8890C9F85A4C3BAAA5DE2B1C9E38B9C69F41EE9F70436880EACDCDB440') 'Mac runtime-input leaf differs'
+    & ${function:Assert-MQ} ((Microsoft.PowerShell.Utility\Get-FileHash $path).Hash-ceq'48175DF7C6A22CD9DBFA794D73FA61CA89C4CD5C89DFA9C9811A802C47906DA6') 'Mac runtime-input leaf differs'
     $cached=Get-Variable -Name MQRuntimeInputs -Scope Script -ErrorAction SilentlyContinue
     if(-not$cached){
         $m=Import-Module $path -Scope Local -PassThru -DisableNameChecking;$bound=@{}
@@ -235,7 +239,7 @@ function Invoke-H3911MacQualifier {
                     & ($commands['Assert-LifeUidCensus']) $c $anchor $visibility
                     & ${function:Assert-MQ} ($visibility.schema-is[string]-and$visibility.scope-is[string]-and$visibility.uidProof.schema-is[string]-and$visibility.uidProof.observationBasis-is[string]-and$visibility.uidProof.selfIdentity.executable-is[string]-and$visibility.uidProof.selfIdentity.executable.Length-le4096-and$visibility.uidProof.selfIdentity.executable-notmatch'[\x00-\x1f\x7f]') 'Bounded completed UID observation required'
                     $held=@{}
-                    foreach($field in 'schema','admittedUid','filter','selectedPidCount','knownPidCount','unionPidCount','validatedPidCount','missingAtRecheckCount','presenceRecheckAttempts','observationBasis','atomicEndpoint','newbornCoverage','universalHistory'){$held[$field]=$visibility.uidProof[$field]}
+                    foreach($field in 'schema','admittedUid','filter','selectedPids','missingAtRecheckPids','outsideProtectedPathPidPids','selectedPidCount','knownPidCount','unionPidCount','validatedPidCount','outsideProtectedPathPidCount','missingAtRecheckCount','presenceRecheckAttempts','observationBasis','atomicEndpoint','newbornCoverage','universalHistory'){$held[$field]=$visibility.uidProof[$field]}
                     $held.selfIdentity=@{};foreach($field in 'pid','created','executable'){$held.selfIdentity[$field]=$visibility.uidProof.selfIdentity[$field]}
                     foreach($role in 'selfCredential','ownerCredential'){
                         $held[$role]=$null

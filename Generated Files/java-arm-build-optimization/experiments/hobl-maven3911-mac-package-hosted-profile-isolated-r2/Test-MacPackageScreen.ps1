@@ -27,7 +27,8 @@ foreach($case in $cases){
         param($c,$anchor)
         $credential=@{pid=100;parentPid=1;realUid=501L;effectiveUid=501L;savedUid=501L;birthSeconds=1767225600L;birthMicroseconds=0L}
         $self=@{pid=20;parentPid=1;realUid=501L;effectiveUid=501L;savedUid=501L;birthSeconds=1767225600L;birthMicroseconds=0L}
-        @{schema='darwin-launch-uid-java-census-v2';scope='launch-effective-UID admitted-JDK Java plus explicitly tracked identities';complete=$true;errors=@();expectedIdentityGone=$false;jdkExecutable=(Join-Path $c.Jdk 'bin/java');tracked=@($anchor);sameJdkJava=@($anchor);knownLive=@($anchor);uidProof=@{schema='darwin-launch-uid-proof-v2';admittedUid=501L;filter=5;selfIdentity=@{pid=20;created='2026-01-01T00:00:00Z';executable='/fixture/pwsh'};selfCredential=$self;ownerCredential=$credential;selectedPidCount=2;knownPidCount=1;unionPidCount=2;validatedPidCount=2;missingAtRecheckCount=0;presenceRecheckAttempts=0;observationBasis='INITIAL_ELIGIBLE_PID_NUMBERS_THEN_UID_SURVIVORS_PLUS_KNOWN_ESRCH_RECHECK';atomicEndpoint=$false;newbornCoverage=$false;universalHistory=$false}}
+        $live=@{};foreach($p in $anchor.GetEnumerator()){$live[$p.Key]=$p.Value};$live.credential=$credential;$live.protectedPathPid=$true
+        @{schema='darwin-launch-uid-java-census-v2';scope='launch-effective-UID admitted-JDK Java plus explicitly tracked identities';complete=$true;errors=@();expectedIdentityGone=$false;jdkExecutable=(Join-Path $c.Jdk 'bin/java');tracked=@($anchor);sameJdkJava=@($live);knownLive=@($live);uidProof=@{schema='darwin-launch-uid-proof-v2';admittedUid=501L;filter=5;selfIdentity=@{pid=20;created='2026-01-01T00:00:00Z';executable='/fixture/pwsh'};selfCredential=$self;ownerCredential=$credential;selectedPids=@(20,$anchor.pid,333);outsideProtectedPathPidPids=@(333);missingAtRecheckPids=@();selectedPidCount=3;knownPidCount=1;unionPidCount=3;validatedPidCount=3;outsideProtectedPathPidCount=1;missingAtRecheckCount=0;presenceRecheckAttempts=0;observationBasis='EUID_SELECTION_TRACKED_UNION_PATH_PID_SCOPE_V1';atomicEndpoint=$false;newbornCoverage=$false;universalHistory=$false}}
     }.GetNewClosure()
     $sampling=@{
         Admit={param($c,$pkg)}
@@ -97,7 +98,10 @@ foreach($case in 'missing-mode','wrong-case','mismatch','forged-budget'){
 }
 foreach($badMode in 'packagescreen','Unknown'){$failed=$false;$root=Join-Path $output $badMode;try{$null=& $invoke -Owned $root -Mode $badMode -FixtureOnly}catch{$failed=$true};if(-not$failed-or(Test-Path $root)){throw 'Bad mode allocated'};$proof+=@{case=('early-mode-'+$badMode);passed=$true}}
 $badRoot=Join-Path $output 'BAD_BUDGET_NOT_CREATED';$failure=$null
-try{$null=& $sup.ExportedCommands['Invoke-H3911MacSupervisor'] -Owned $badRoot -Nonce ([guid]::NewGuid().ToString('N')) -Mode PackageScreen -DeadlineMilliseconds 600000 -RootRuntimeApproved}catch{$failure=$_.Exception.Message}
+$tokens=$null;$errors=$null;$supAst=[Management.Automation.Language.Parser]::ParseFile((Join-Path $runtime 'H3911.MacSupervisor.psm1'),[ref]$tokens,[ref]$errors)
+$deadlineGuard=$supAst.Find({param($n)$n-is[Management.Automation.Language.CommandAst]-and$n.Extent.Text.Contains("'Unreviewed mode deadline'")},$true)
+$deadlinePredicate=[scriptblock]::Create('param($RootRuntimeApproved,$DeadlineMilliseconds,$contract) '+$deadlineGuard.CommandElements[1].Extent.Text)
+if(-not(& $deadlinePredicate ([Management.Automation.SwitchParameter]::new($true)) 600000 (& $get PackageScreen))){$failure='HOLD: Unreviewed mode deadline'}
 if(-not$failure-or$failure-notlike'*Unreviewed mode deadline*'-or(Test-Path $badRoot)){throw 'Unreviewed package budget allocated or was silently defaulted'}
 $proof+=@{case='wrong-package-deadline-before-allocation';passed=$true}
 @{verdict='PASS';cases=$proof;actualMacCalls=0;actualJavaCalls=0;wholeOperatorStub=$false;modelDurationsNotGain=$true}|ConvertTo-Json -Depth 8|Set-Content (Join-Path $OutputRoot 'caller-model-proof.json')
